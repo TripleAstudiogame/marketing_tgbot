@@ -102,6 +102,44 @@ input {
   margin-bottom: 16px;
 }
 .notice.error { background: #fff1f2; border-color: #fecdd3; color: #9f1239; }
+.system-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  margin-bottom: 16px;
+}
+.system-banner strong { display: block; font-size: 16px; }
+.system-banner span { color: var(--muted); }
+.system-banner.ok { border-color: #bbf7d0; background: #f0fdf4; }
+.system-banner.warning { border-color: #fde68a; background: #fffbeb; }
+.system-banner.error { border-color: #fecdd3; background: #fff1f2; }
+.check-list { display: grid; gap: 10px; }
+.check-item {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fbfcfb;
+}
+.check-item p { margin: 4px 0; }
+.check-item small { color: var(--muted); }
+.check-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-top: 4px;
+  background: #94a3b8;
+}
+.check-item.ok .check-dot { background: #16a34a; }
+.check-item.warning .check-dot { background: #f59e0b; }
+.check-item.error .check-dot { background: #e11d48; }
 .search { display: flex; gap: 8px; margin-bottom: 18px; }
 .result { border-top: 1px solid var(--line); padding: 12px 0; }
 .result small { display: block; color: var(--muted); margin: 4px 0; }

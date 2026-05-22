@@ -2,16 +2,37 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
+import logging
 
 import uvicorn
 
 from app.bot import create_bot, create_dispatcher
 from app.config import get_settings
 from app.db import init_db
+from app.logging_config import configure_logging
 from app.worker import worker_loop
+
+logger = logging.getLogger(__name__)
+
+
+def uvicorn_config(settings) -> uvicorn.Config:
+    return uvicorn.Config(
+        "app.main:create_app",
+        host=settings.app_host,
+        port=settings.app_port,
+        factory=True,
+        log_level="info",
+    )
+
+
+async def serve_web_async(settings) -> None:
+    server = uvicorn.Server(uvicorn_config(settings))
+    await server.serve()
 
 
 async def run_polling_with_worker() -> None:
+    configure_logging(get_settings())
     await init_db()
     bot = create_bot()
     dispatcher = create_dispatcher()
@@ -20,43 +41,41 @@ async def run_polling_with_worker() -> None:
         await dispatcher.start_polling(bot)
     finally:
         worker_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await worker_task
         await bot.session.close()
 
 
 async def run_all() -> None:
+    configure_logging(get_settings())
     await init_db()
     settings = get_settings()
+    if not settings.telegram_bot_token:
+        logger.warning("TELEGRAM_BOT_TOKEN is missing; starting setup-only web mode")
+        await serve_web_async(settings)
+        return
     settings.run_worker_in_web = False
     bot = create_bot()
     dispatcher = create_dispatcher()
     worker_task = asyncio.create_task(worker_loop(bot))
     polling_task = asyncio.create_task(dispatcher.start_polling(bot))
-    server = uvicorn.Server(
-        uvicorn.Config(
-            "app.main:create_app",
-            host=settings.app_host,
-            port=settings.app_port,
-            factory=True,
-            log_level="info",
-        )
-    )
+    server = uvicorn.Server(uvicorn_config(settings))
     try:
         await server.serve()
     finally:
         polling_task.cancel()
         worker_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await polling_task
+        with contextlib.suppress(asyncio.CancelledError):
+            await worker_task
         await bot.session.close()
 
 
 def run_web() -> None:
     settings = get_settings()
-    uvicorn.run(
-        "app.main:create_app",
-        host=settings.app_host,
-        port=settings.app_port,
-        factory=True,
-        log_level="info",
-    )
+    configure_logging(settings)
+    uvicorn.run("app.main:create_app", host=settings.app_host, port=settings.app_port, factory=True, log_level="info")
 
 
 def main() -> None:

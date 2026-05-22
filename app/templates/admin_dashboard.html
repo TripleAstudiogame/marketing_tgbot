@@ -7,9 +7,20 @@
   </div>
   <div class="actions">
     <a class="button" href="/admin/setup">Открыть подключение</a>
+    <a class="button secondary" href="/admin/system">Диагностика</a>
     <a class="button secondary" href="/admin/settings">Расширенные настройки</a>
   </div>
 </header>
+
+<section class="system-banner {{ diagnostics.status }}">
+  <div>
+    <strong>
+      {% if diagnostics.status == "ok" %}Система готова{% elif diagnostics.status == "warning" %}Система требует настройки{% else %}Есть критичные ошибки{% endif %}
+    </strong>
+    <span>{{ diagnostics.checks|length }} проверок · Worker: {% if worker_state.running %}работает{% else %}не активен{% endif %}</span>
+  </div>
+  <a href="/admin/system">Открыть подробности</a>
+</section>
 
 <section class="stats">
   <div class="stat"><small>Pending</small><strong>{{ totals.pending }}</strong></div>

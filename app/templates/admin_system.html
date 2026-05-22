@@ -1,0 +1,81 @@
+{% extends "admin_base.html" %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <h1>Система</h1>
+    <p>Диагностика production-запуска: база, Obsidian, ИИ, Telegram, файлы и worker.</p>
+  </div>
+  <div class="actions">
+    <a class="button" href="/admin/setup">Подключение</a>
+    <a class="button secondary" href="/health/ready">JSON ready</a>
+  </div>
+</header>
+
+<section class="system-banner {{ diagnostics.status }}">
+  <div>
+    <strong>
+      {% if diagnostics.status == "ok" %}Все ключевые проверки прошли{% elif diagnostics.status == "warning" %}Есть предупреждения{% else %}Есть ошибки, требующие исправления{% endif %}
+    </strong>
+    <span>Process ID: {{ diagnostics.stats.process_id }} · Failed jobs: {{ diagnostics.stats.failed_jobs }}</span>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Worker</h2>
+  <dl class="kv">
+    <dt>Running</dt><dd>{{ worker_state.running }}</dd>
+    <dt>Started</dt><dd>{{ worker_state.started_at or "-" }}</dd>
+    <dt>Heartbeat</dt><dd>{{ worker_state.last_heartbeat_at or "-" }}</dd>
+    <dt>Processed jobs</dt><dd>{{ worker_state.processed_jobs }}</dd>
+    <dt>Last job</dt><dd>{{ worker_state.last_job_id or "-" }}</dd>
+    <dt>Failed loops</dt><dd>{{ worker_state.failed_iterations }}</dd>
+    <dt>Last error</dt><dd><pre>{{ worker_state.last_error or "-" }}</pre></dd>
+  </dl>
+</section>
+
+<section class="panel">
+  <h2>Проверки</h2>
+  <div class="check-list">
+    {% for item in diagnostics.checks %}
+    <article class="check-item {{ item.level }}">
+      <span class="check-dot"></span>
+      <div>
+        <strong>{{ item.name }}</strong>
+        <p>{{ item.detail }}</p>
+        {% if item.action %}<small>{{ item.action }}</small>{% endif %}
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Runtime</h2>
+  <dl class="kv">
+    <dt>Environment</dt><dd>{{ settings.environment }}</dd>
+    <dt>Host</dt><dd>{{ settings.app_host }}:{{ settings.app_port }}</dd>
+    <dt>Reports</dt><dd>{{ settings.reports_path }}</dd>
+    <dt>Logs</dt><dd>{{ settings.logs_path }}</dd>
+    <dt>Vault</dt><dd>{{ runtime.obsidian_vault_path }}</dd>
+    <dt>AI order</dt><dd>{{ runtime.ai_provider_order|join(", ") }}</dd>
+  </dl>
+</section>
+
+<section class="panel">
+  <h2>Логи</h2>
+  <table>
+    <thead><tr><th>Файл</th><th>Размер</th><th>Путь</th></tr></thead>
+    <tbody>
+      {% for file in log_files %}
+      <tr>
+        <td>{{ file.name }}</td>
+        <td>{{ file.size }} bytes</td>
+        <td>{{ file.path }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="3" class="empty">Логи пока не созданы.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

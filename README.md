@@ -54,6 +54,18 @@ Or start manually:
 PowerShell -ExecutionPolicy Bypass -File .\scripts\run_local_all.ps1
 ```
 
+For production-like local/server startup after setup:
+
+```text
+START_PRODUCTION.bat
+```
+
+To stop local processes:
+
+```text
+STOP_LOCAL.bat
+```
+
 6. Open admin panel:
 
 ```text
@@ -144,7 +156,9 @@ Routes:
 - `/admin/knowledge` search and reindex Obsidian vault.
 - `/admin/memory` view and initialize AI memory notes.
 - `/admin/jobs` generated report jobs.
+- `/admin/system` production diagnostics, readiness checks, logs, and worker state.
 - `/health` health check.
+- `/health/ready` readiness diagnostics as JSON.
 
 ## AI Memory
 
@@ -219,3 +233,12 @@ Generated files are saved in `reports/` and optionally mirrored into:
 - Use HTTPS for webhook mode.
 - Run behind Caddy, IIS reverse proxy, Nginx, or a tunnel if exposing the admin panel.
 - Back up the Obsidian vault and `data/app.db`.
+
+## Production Operations
+
+- `START_LOCAL.bat` is the friendly first-run launcher. It can start setup-only mode before Telegram is configured.
+- `START_PRODUCTION.bat` is the stricter production launcher. It requires `TELEGRAM_BOT_TOKEN`, starts the full bot, waits for `/health/ready`, then opens `/admin/system`.
+- `STOP_LOCAL.bat` stops local project processes.
+- `scripts/install_windows_scheduled_task.ps1` installs a Windows startup task. Default mode is production.
+- Logs are written to `logs/app.log`, `logs/error.log`, and startup-specific log files.
+- `/admin/system` is the main diagnostics screen for database, Obsidian, AI keys, Telegram token, worker state, and log locations.

@@ -17,9 +17,11 @@ from app.db import get_session
 from app.models import Job, JobStatus, KnowledgeDocument
 from app.runtime import get_runtime_config, get_runtime_settings, get_settings_for_admin, parse_bool, update_runtime_settings
 from app.services.env_file import update_env_file
+from app.services.diagnostics import collect_diagnostics
 from app.services.jobs import cancel_job, jobs_query, retry_job
 from app.services.knowledge import KnowledgeBase
 from app.services.memory import MemoryService
+from app.worker import worker_state
 
 
 admin_router = APIRouter(prefix="/admin", tags=["admin"])
@@ -131,6 +133,7 @@ async def dashboard(
     docs_count = (await session.execute(select(func.count()).select_from(KnowledgeDocument))).scalar_one()
     latest_jobs = (await session.execute(jobs_query().limit(8))).scalars().all()
     runtime = await get_runtime_config(session)
+    diagnostics = await collect_diagnostics(session, get_settings(), runtime)
     return templates.TemplateResponse(
         request,
         "admin_dashboard.html",
@@ -141,6 +144,42 @@ async def dashboard(
             "jobs": latest_jobs,
             "runtime": runtime,
             "settings": get_settings(),
+            "diagnostics": diagnostics,
+            "worker_state": worker_state,
+        },
+    )
+
+
+@admin_router.get("/system", response_class=HTMLResponse)
+async def system_page(
+    request: Request,
+    _: str = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> HTMLResponse:
+    settings = get_settings()
+    runtime = await get_runtime_config(session)
+    diagnostics = await collect_diagnostics(session, settings, runtime)
+    log_files = []
+    if settings.logs_path.exists():
+        for path in sorted(settings.logs_path.glob("*.log")):
+            log_files.append(
+                {
+                    "name": path.name,
+                    "path": str(path),
+                    "size": path.stat().st_size,
+                    "updated": path.stat().st_mtime,
+                }
+            )
+    return templates.TemplateResponse(
+        request,
+        "admin_system.html",
+        {
+            "request": request,
+            "settings": settings,
+            "runtime": runtime,
+            "diagnostics": diagnostics,
+            "worker_state": worker_state,
+            "log_files": log_files,
         },
     )
 
