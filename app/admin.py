@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
@@ -21,6 +21,7 @@ from app.services.diagnostics import collect_diagnostics
 from app.services.jobs import cancel_job, jobs_query, retry_job
 from app.services.knowledge import KnowledgeBase
 from app.services.memory import MemoryService
+from app.services.vault_discovery import discover_vaults, list_directories
 from app.worker import worker_state
 
 
@@ -205,6 +206,7 @@ async def setup_page(
         "openrouter": configured_secret(stored.get("OPENROUTER_API_KEY", settings.openrouter_api_key)),
         "local": True,
     }
+    vault_candidates = discover_vaults(max_depth=2, max_results=8)
     return templates.TemplateResponse(
         request,
         "admin_setup.html",
@@ -223,8 +225,24 @@ async def setup_page(
             "memory_path": memory.memory_path,
             "memory_exists": memory.memory_path.exists(),
             "provider_status": provider_status,
+            "vault_candidates": vault_candidates,
         },
     )
+
+
+@admin_router.get("/api/filesystem")
+async def api_filesystem(
+    path: str = "",
+    _: str = Depends(require_admin),
+) -> JSONResponse:
+    return JSONResponse(list_directories(path or None))
+
+
+@admin_router.get("/api/vaults/discover")
+async def api_discover_vaults(
+    _: str = Depends(require_admin),
+) -> JSONResponse:
+    return JSONResponse({"candidates": discover_vaults(max_depth=3, max_results=20)})
 
 
 @admin_router.post("/setup/telegram")

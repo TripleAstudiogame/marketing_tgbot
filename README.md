@@ -82,6 +82,8 @@ http://127.0.0.1:8000/admin/setup
 
 The Setup screen lets you connect Telegram, choose/create the Obsidian vault, add AI API keys, test providers, initialize AI Memory, and reindex knowledge.
 
+The Obsidian section has a server-side folder picker and vault auto-discovery, so you do not need to type Windows paths by hand.
+
 ## Local vs Server Modes
 
 ### Local / Same Server With Obsidian
