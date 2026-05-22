@@ -40,7 +40,15 @@ GEMINI_API_KEY=optional-but-recommended
 PowerShell -ExecutionPolicy Bypass -File .\scripts\setup_windows.ps1
 ```
 
-5. Start local all-in-one mode:
+5. Start local all-in-one mode by double-clicking:
+
+```text
+START_LOCAL.bat
+```
+
+It starts the server, waits for `/health`, and opens the visual setup page automatically.
+
+Or start manually:
 
 ```powershell
 PowerShell -ExecutionPolicy Bypass -File .\scripts\run_local_all.ps1
