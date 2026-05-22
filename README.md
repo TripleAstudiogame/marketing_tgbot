@@ -54,6 +54,14 @@ http://127.0.0.1:8000/admin
 
 Use the username/password from `.env`.
 
+For a guided visual setup, open:
+
+```text
+http://127.0.0.1:8000/admin/setup
+```
+
+The Setup screen lets you connect Telegram, choose/create the Obsidian vault, add AI API keys, test providers, initialize AI Memory, and reindex knowledge.
+
 ## Local vs Server Modes
 
 ### Local / Same Server With Obsidian

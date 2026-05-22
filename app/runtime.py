@@ -28,6 +28,9 @@ class SettingDefinition:
 
 
 SETTING_DEFINITIONS: list[SettingDefinition] = [
+    SettingDefinition("TELEGRAM_BOT_TOKEN", "Telegram bot token", "BotFather token. Saved to .env; restart the app after changing it.", "telegram_bot_token", True),
+    SettingDefinition("TELEGRAM_USE_WEBHOOK", "Telegram webhook mode", "true/false. Local mode should normally be false.", "telegram_use_webhook"),
+    SettingDefinition("PUBLIC_BASE_URL", "Public base URL", "HTTPS domain for webhook mode.", "public_base_url"),
     SettingDefinition("OBSIDIAN_VAULT_PATH", "Obsidian vault path", "Folder with Markdown notes.", "obsidian_vault_path"),
     SettingDefinition("TELEGRAM_ALLOWED_USER_IDS", "Allowed Telegram user IDs", "Comma-separated list. Empty means everyone can use the bot.", "telegram_allowed_user_ids"),
     SettingDefinition("AI_PROVIDER_ORDER", "AI provider order", "Comma-separated list: gemini, groq, openrouter, local.", "ai_provider_order"),

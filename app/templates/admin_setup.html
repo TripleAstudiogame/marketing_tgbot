@@ -1,0 +1,151 @@
+{% extends "admin_base.html" %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <h1>Подключение</h1>
+    <p>Здесь подключаются Telegram, Obsidian, ИИ-провайдеры и долговременная память бота.</p>
+  </div>
+  <a class="button secondary" href="/admin/settings">Расширенные настройки</a>
+</header>
+
+{% if request.query_params.get("message") %}
+<div class="notice {% if request.query_params.get('telegram') == 'error' or request.query_params.get('obsidian') == 'error' or request.query_params.get('ai') == 'error' %}error{% endif %}">
+  {{ request.query_params.get("message") }}
+</div>
+{% endif %}
+
+<section class="setup-overview">
+  <div class="setup-step {% if telegram_configured %}ready{% endif %}">
+    <span>1</span>
+    <strong>Telegram</strong>
+    <small>{% if telegram_configured %}Токен подключен{% else %}Токен не добавлен{% endif %}</small>
+  </div>
+  <div class="setup-step {% if vault_exists %}ready{% endif %}">
+    <span>2</span>
+    <strong>Obsidian</strong>
+    <small>{% if vault_exists %}Vault найден{% else %}Vault не найден{% endif %}</small>
+  </div>
+  <div class="setup-step {% if provider_status.gemini or provider_status.groq or provider_status.openrouter %}ready{% endif %}">
+    <span>3</span>
+    <strong>AI</strong>
+    <small>{% if provider_status.gemini or provider_status.groq or provider_status.openrouter %}Облачный ИИ готов{% else %}Только локальный fallback{% endif %}</small>
+  </div>
+  <div class="setup-step {% if memory_exists %}ready{% endif %}">
+    <span>4</span>
+    <strong>Память</strong>
+    <small>{% if memory_exists %}Инициализирована{% else %}Не создана{% endif %}</small>
+  </div>
+</section>
+
+<section class="setup-grid">
+  <form class="connect-card" action="/admin/setup/telegram" method="post">
+    <div class="card-head">
+      <div>
+        <h2>Telegram Bot</h2>
+        <p>Вставь токен из BotFather и при желании разреши доступ только своим Telegram ID.</p>
+      </div>
+      <span class="status-dot {% if telegram_configured %}ok{% endif %}"></span>
+    </div>
+    <label>
+      <span>Токен бота</span>
+      <input name="TELEGRAM_BOT_TOKEN" type="password" placeholder="{% if telegram_configured %}Уже подключен. Оставь пустым, чтобы не менять.{% else %}123456:ABC...{% endif %}">
+    </label>
+    <label>
+      <span>Разрешенные Telegram user ID</span>
+      <input name="TELEGRAM_ALLOWED_USER_IDS" value="{{ runtime.telegram_allowed_user_ids|join(',') }}" placeholder="123456789,987654321">
+    </label>
+    <label class="switch-row">
+      <input name="TELEGRAM_USE_WEBHOOK" type="checkbox" {% if telegram_use_webhook %}checked{% endif %}>
+      <span>Использовать webhook на публичном HTTPS-сервере</span>
+    </label>
+    <label>
+      <span>Публичный URL сервера</span>
+      <input name="PUBLIC_BASE_URL" value="{{ public_base_url }}" placeholder="https://your-domain.com">
+    </label>
+    <div class="hint">После первого добавления или смены Telegram token перезапусти приложение, чтобы polling/webhook стартовал с новым токеном.</div>
+    <button class="button" type="submit">Сохранить и проверить Telegram</button>
+  </form>
+
+  <form class="connect-card" action="/admin/setup/obsidian" method="post">
+    <div class="card-head">
+      <div>
+        <h2>Obsidian Vault</h2>
+        <p>Выбери папку, которую Obsidian открывает как vault. Бот читает Markdown-файлы напрямую.</p>
+      </div>
+      <span class="status-dot {% if vault_exists %}ok{% endif %}"></span>
+    </div>
+    <label>
+      <span>Путь к vault</span>
+      <input name="OBSIDIAN_VAULT_PATH" value="{{ runtime.obsidian_vault_path }}" placeholder="C:\Obsidian\MarketingVault">
+    </label>
+    <label class="switch-row">
+      <input name="CREATE_VAULT" type="checkbox" checked>
+      <span>Создать стартовые папки и файлы, если их нет</span>
+    </label>
+    <div class="mini-status">
+      <div><small>Текущий путь</small><strong>{{ vault_path }}</strong></div>
+      <div><small>Проиндексировано заметок</small><strong>{{ docs_count }}</strong></div>
+    </div>
+    <h3>Память</h3>
+    <label class="switch-row">
+      <input name="AI_MEMORY_ENABLED" type="checkbox" {% if runtime.ai_memory_enabled %}checked{% endif %}>
+      <span>Разрешить ИИ записывать полезные заметки памяти в Obsidian</span>
+    </label>
+    <label>
+      <span>Папка памяти</span>
+      <input name="AI_MEMORY_DIR" value="{{ runtime.ai_memory_dir }}">
+    </label>
+    <label>
+      <span>Минимальная важность</span>
+      <input name="AI_MEMORY_MIN_IMPORTANCE" value="{{ runtime.ai_memory_min_importance }}">
+    </label>
+    <label class="switch-row">
+      <input name="AI_MEMORY_AUTO_REINDEX" type="checkbox" {% if runtime.ai_memory_auto_reindex %}checked{% endif %}>
+      <span>Переиндексировать после каждой записи памяти</span>
+    </label>
+    <button class="button" type="submit">Сохранить, создать и переиндексировать</button>
+  </form>
+
+  <form class="connect-card wide" action="/admin/setup/ai" method="post">
+    <div class="card-head">
+      <div>
+        <h2>ИИ-провайдеры</h2>
+        <p>Gemini рекомендован первым. Groq и OpenRouter работают как запасные варианты. Local fallback нужен, чтобы бот тестировался даже без API-ключей.</p>
+      </div>
+      <span class="status-dot {% if provider_status.gemini or provider_status.groq or provider_status.openrouter %}ok{% endif %}"></span>
+    </div>
+    <label>
+      <span>Порядок провайдеров</span>
+      <input name="AI_PROVIDER_ORDER" value="{{ runtime.ai_provider_order|join(',') }}">
+    </label>
+    <div class="provider-grid">
+      <div class="provider-box">
+        <h3>Gemini <span class="badge {% if provider_status.gemini %}completed{% endif %}">{% if provider_status.gemini %}подключен{% else %}пусто{% endif %}</span></h3>
+        <label><span>API key</span><input name="GEMINI_API_KEY" type="password" placeholder="{% if provider_status.gemini %}Уже подключен. Оставь пустым, чтобы не менять.{% else %}AIza...{% endif %}"></label>
+        <label><span>Модель</span><input name="GEMINI_MODEL" value="{{ runtime.gemini_model }}"></label>
+        <button class="button secondary" name="test_provider" value="gemini" type="submit">Сохранить и проверить Gemini</button>
+      </div>
+      <div class="provider-box">
+        <h3>Groq <span class="badge {% if provider_status.groq %}completed{% endif %}">{% if provider_status.groq %}подключен{% else %}пусто{% endif %}</span></h3>
+        <label><span>API key</span><input name="GROQ_API_KEY" type="password" placeholder="{% if provider_status.groq %}Уже подключен. Оставь пустым, чтобы не менять.{% else %}gsk_...{% endif %}"></label>
+        <label><span>Модель</span><input name="GROQ_MODEL" value="{{ runtime.groq_model }}"></label>
+        <button class="button secondary" name="test_provider" value="groq" type="submit">Сохранить и проверить Groq</button>
+      </div>
+      <div class="provider-box">
+        <h3>OpenRouter <span class="badge {% if provider_status.openrouter %}completed{% endif %}">{% if provider_status.openrouter %}подключен{% else %}пусто{% endif %}</span></h3>
+        <label><span>API key</span><input name="OPENROUTER_API_KEY" type="password" placeholder="{% if provider_status.openrouter %}Уже подключен. Оставь пустым, чтобы не менять.{% else %}sk-or-v1-...{% endif %}"></label>
+        <label><span>Модель</span><input name="OPENROUTER_MODEL" value="{{ runtime.openrouter_model }}"></label>
+        <button class="button secondary" name="test_provider" value="openrouter" type="submit">Сохранить и проверить OpenRouter</button>
+      </div>
+    </div>
+    <label>
+      <span>Фрагментов базы знаний на задачу</span>
+      <input name="MAX_KNOWLEDGE_SNIPPETS" value="{{ runtime.max_knowledge_snippets }}">
+    </label>
+    <div class="actions">
+      <button class="button" type="submit">Сохранить настройки ИИ</button>
+      <button class="button secondary" name="test_provider" value="local" type="submit">Проверить local fallback</button>
+    </div>
+  </form>
+</section>
+{% endblock %}
