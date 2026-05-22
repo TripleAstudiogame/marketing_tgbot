@@ -6,6 +6,7 @@ Production-oriented Telegram bot for marketing content plans. It reads an Obsidi
 
 - Accepts a marketing task in Telegram.
 - Searches an Obsidian vault stored on the same PC/server.
+- Maintains an Obsidian-based AI memory about prior work, marketer preferences, useful facts, and missing data.
 - Builds a structured content plan with strategy, calendar, post texts, CTAs, and visual prompts.
 - Renders a polished PDF.
 - Sends the PDF to Telegram.
@@ -125,8 +126,50 @@ Routes:
 - `/admin` dashboard.
 - `/admin/settings` runtime settings.
 - `/admin/knowledge` search and reindex Obsidian vault.
+- `/admin/memory` view and initialize AI memory notes.
 - `/admin/jobs` generated report jobs.
 - `/health` health check.
+
+## AI Memory
+
+The bot has a durable memory layer inside Obsidian. After a task is completed, the AI runs a separate memory extraction step and decides whether something is worth saving for future tasks.
+
+Default folder:
+
+```text
+MarketingVault/
+  06_AI_Memory/
+    _index.md
+    marketer_profile.md
+    facts.md
+    followups.md
+    01_Work_Log/
+    02_Session_Notes/
+```
+
+What it saves:
+
+- marketer preferences and working style;
+- durable brand, audience, offer, and positioning facts;
+- summaries of completed work;
+- missing data and future questions.
+
+What it should not save:
+
+- one-off reasoning;
+- passwords, tokens, API keys, and secrets;
+- sensitive personal data unless explicitly requested.
+
+Memory settings:
+
+```env
+AI_MEMORY_ENABLED=true
+AI_MEMORY_DIR=06_AI_Memory
+AI_MEMORY_MIN_IMPORTANCE=2
+AI_MEMORY_AUTO_REINDEX=true
+```
+
+When `AI_MEMORY_AUTO_REINDEX=true`, new memory notes are indexed immediately, so the next Telegram task can use them without manual reindexing.
 
 ## AI Providers
 
@@ -160,4 +203,3 @@ Generated files are saved in `reports/` and optionally mirrored into:
 - Use HTTPS for webhook mode.
 - Run behind Caddy, IIS reverse proxy, Nginx, or a tunnel if exposing the admin panel.
 - Back up the Obsidian vault and `data/app.db`.
-

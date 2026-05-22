@@ -38,6 +38,10 @@ SETTING_DEFINITIONS: list[SettingDefinition] = [
     SettingDefinition("OPENROUTER_API_KEY", "OpenRouter API key", "Fallback provider for free models.", "openrouter_api_key", True),
     SettingDefinition("OPENROUTER_MODEL", "OpenRouter model", "Example: google/gemini-2.0-flash-exp:free.", "openrouter_model"),
     SettingDefinition("MAX_KNOWLEDGE_SNIPPETS", "Max knowledge snippets", "How many Obsidian snippets to send to the LLM.", "max_knowledge_snippets"),
+    SettingDefinition("AI_MEMORY_ENABLED", "AI memory enabled", "true/false. Let the bot write durable memory notes into Obsidian.", "ai_memory_enabled"),
+    SettingDefinition("AI_MEMORY_DIR", "AI memory folder", "Folder inside the Obsidian vault for durable bot memory.", "ai_memory_dir"),
+    SettingDefinition("AI_MEMORY_MIN_IMPORTANCE", "AI memory min importance", "Only write memories with this importance or higher, from 1 to 5.", "ai_memory_min_importance"),
+    SettingDefinition("AI_MEMORY_AUTO_REINDEX", "Reindex after memory write", "true/false. Makes new memory available to the next task immediately.", "ai_memory_auto_reindex"),
     SettingDefinition("POLLINATIONS_ENABLED", "Pollinations images", "true/false. If false, PDF uses branded cards and visual prompts.", "pollinations_enabled"),
     SettingDefinition("BRAND_NAME", "Brand name", "Used in PDF cover and captions.", "brand_name"),
     SettingDefinition("BRAND_PRIMARY_COLOR", "Brand primary color", "Hex color for PDF.", "brand_primary_color"),
@@ -57,6 +61,10 @@ class RuntimeConfig:
     openrouter_api_key: str
     openrouter_model: str
     max_knowledge_snippets: int
+    ai_memory_enabled: bool
+    ai_memory_dir: str
+    ai_memory_min_importance: int
+    ai_memory_auto_reindex: bool
     pollinations_enabled: bool
     brand_name: str
     brand_primary_color: str
@@ -170,9 +178,12 @@ async def get_runtime_config(session: AsyncSession) -> RuntimeConfig:
         openrouter_api_key=value("OPENROUTER_API_KEY", "openrouter_api_key"),
         openrouter_model=value("OPENROUTER_MODEL", "openrouter_model"),
         max_knowledge_snippets=parse_int(value("MAX_KNOWLEDGE_SNIPPETS", "max_knowledge_snippets"), settings.max_knowledge_snippets),
+        ai_memory_enabled=parse_bool(value("AI_MEMORY_ENABLED", "ai_memory_enabled")),
+        ai_memory_dir=value("AI_MEMORY_DIR", "ai_memory_dir"),
+        ai_memory_min_importance=parse_int(value("AI_MEMORY_MIN_IMPORTANCE", "ai_memory_min_importance"), settings.ai_memory_min_importance),
+        ai_memory_auto_reindex=parse_bool(value("AI_MEMORY_AUTO_REINDEX", "ai_memory_auto_reindex")),
         pollinations_enabled=parse_bool(value("POLLINATIONS_ENABLED", "pollinations_enabled")),
         brand_name=value("BRAND_NAME", "brand_name"),
         brand_primary_color=value("BRAND_PRIMARY_COLOR", "brand_primary_color"),
         brand_accent_color=value("BRAND_ACCENT_COLOR", "brand_accent_color"),
     )
-

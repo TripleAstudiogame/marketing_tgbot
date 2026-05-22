@@ -51,6 +51,11 @@ class Settings(BaseSettings):
     logs_dir: str = "./logs"
     max_knowledge_snippets: int = 10
 
+    ai_memory_enabled: bool = True
+    ai_memory_dir: str = "06_AI_Memory"
+    ai_memory_min_importance: int = 2
+    ai_memory_auto_reindex: bool = True
+
     brand_primary_color: str = "#0f766e"
     brand_accent_color: str = "#f59e0b"
     brand_name: str = "Marketing Bot"

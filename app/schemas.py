@@ -47,3 +47,17 @@ class GeneratedReport(BaseModel):
     html_path: str
     markdown_path: str = ""
 
+
+class MemoryFact(BaseModel):
+    category: str = "general"
+    text: str
+    confidence: str = "medium"
+
+
+class MemoryUpdate(BaseModel):
+    should_write: bool = False
+    importance: int = 1
+    summary: str = ""
+    facts: list[MemoryFact] = Field(default_factory=list)
+    followups: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)

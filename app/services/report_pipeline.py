@@ -7,10 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.models import Job
-from app.runtime import RuntimeConfig, get_runtime_config
+from app.runtime import get_runtime_config
 from app.services.ai import AIProviderRouter
 from app.services.jobs import complete_job, fail_job, update_job_progress
 from app.services.knowledge import KnowledgeBase
+from app.services.memory import MemoryService
 from app.services.pdf import PDFRenderer, plan_to_markdown
 from app.services.telegram import TelegramMessenger
 
@@ -27,6 +28,20 @@ def progress_text(step: str, percent: int, detail: str = "") -> str:
     if detail:
         lines.extend(["", detail])
     return "\n".join(lines)
+
+
+def merge_snippets(primary: list, secondary: list, limit: int) -> list:
+    seen: set[tuple[str, str]] = set()
+    merged: list = []
+    for snippet in [*primary, *secondary]:
+        key = (snippet.source_path, snippet.text[:120])
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(snippet)
+        if len(merged) >= limit:
+            break
+    return merged
 
 
 class ReportPipeline:
@@ -51,6 +66,7 @@ class ReportPipeline:
             settings = get_settings()
             config = await get_runtime_config(session)
             knowledge = KnowledgeBase(config.obsidian_vault_path, settings.knowledge_index_file)
+            memory = MemoryService(config.obsidian_vault_path, config.ai_memory_dir)
 
             await self._set_progress(
                 session,
@@ -75,6 +91,12 @@ class ReportPipeline:
                 progress_text("Ищу в базе знаний бренд, ЦА, офферы, стиль и примеры.", 35),
             )
             snippets = knowledge.search(job.task_text, limit=config.max_knowledge_snippets)
+            if config.ai_memory_enabled:
+                memory_snippets = knowledge.search(
+                    "AI Memory память маркетолог профиль последние работы предпочтения стиль followups",
+                    limit=max(3, config.max_knowledge_snippets // 2),
+                )
+                snippets = merge_snippets(snippets, memory_snippets, config.max_knowledge_snippets)
             source_detail = f"Нашел фрагментов: {len(snippets)}." if snippets else "Релевантных фрагментов мало, аккуратно дополню план маркетинговой логикой."
 
             await self._set_progress(
@@ -104,6 +126,23 @@ class ReportPipeline:
             markdown = plan_to_markdown(plan, provider, pdf_path)
             markdown_path = knowledge.save_markdown_report(plan.project, markdown)
 
+            if config.ai_memory_enabled:
+                await self._set_progress(
+                    session,
+                    messenger,
+                    job,
+                    progress_text("Обновляю рабочую память в Obsidian, чтобы следующие задачи были умнее.", 95),
+                )
+                try:
+                    memory_update, memory_provider, memory_errors = await self.ai_router.extract_memory_update(job.task_text, plan, snippets, config)
+                    memory_paths = memory.write_update(job, plan, memory_update, memory_provider, markdown_path, config)
+                    if memory_paths and config.ai_memory_auto_reindex:
+                        await knowledge.rebuild_index(session)
+                    if memory_errors:
+                        plan.recommendations.append("Техническая заметка: память была обновлена через fallback-провайдер.")
+                except Exception:
+                    plan.recommendations.append("Техническая заметка: не удалось обновить долговременную память Obsidian.")
+
             await messenger.delete_progress(job.chat_id, job.progress_message_id)
             caption = (
                 f"Готово: {plan.project}\n"
@@ -130,4 +169,3 @@ class ReportPipeline:
                 f"Ошибка: {error}\n\n"
                 "Проверьте настройки в админке: Telegram token, AI keys, Obsidian path и Playwright Chromium.",
             )
-

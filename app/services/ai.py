@@ -9,7 +9,7 @@ import httpx
 from pydantic import ValidationError
 
 from app.runtime import RuntimeConfig
-from app.schemas import CalendarItem, ContentPlan, ContentStrategy, KnowledgeSnippet
+from app.schemas import CalendarItem, ContentPlan, ContentStrategy, KnowledgeSnippet, MemoryFact, MemoryUpdate
 
 
 class AIProviderError(RuntimeError):
@@ -22,6 +22,15 @@ class AIProvider(ABC):
     @abstractmethod
     async def generate_plan(self, task_text: str, snippets: list[KnowledgeSnippet], config: RuntimeConfig) -> ContentPlan:
         raise NotImplementedError
+
+    async def extract_memory_update(
+        self,
+        task_text: str,
+        plan: ContentPlan,
+        snippets: list[KnowledgeSnippet],
+        config: RuntimeConfig,
+    ) -> MemoryUpdate:
+        return MemoryUpdate()
 
 
 def strip_json_fence(text: str) -> str:
@@ -36,6 +45,11 @@ def strip_json_fence(text: str) -> str:
 def parse_plan(text: str) -> ContentPlan:
     payload = json.loads(strip_json_fence(text))
     return ContentPlan.model_validate(payload)
+
+
+def parse_memory_update(text: str) -> MemoryUpdate:
+    payload = json.loads(strip_json_fence(text))
+    return MemoryUpdate.model_validate(payload)
 
 
 def build_prompt(task_text: str, snippets: list[KnowledgeSnippet], config: RuntimeConfig) -> str:
@@ -101,18 +115,72 @@ def build_prompt(task_text: str, snippets: list[KnowledgeSnippet], config: Runti
 """.strip()
 
 
+def build_memory_prompt(task_text: str, plan: ContentPlan, snippets: list[KnowledgeSnippet], config: RuntimeConfig) -> str:
+    source_block = "\n".join(f"- {snippet.source_path}: {snippet.title}" for snippet in snippets[:8])
+    if not source_block:
+        source_block = "- Релевантных источников не было."
+    return f"""
+Ты отвечаешь только за долговременную память маркетингового Telegram-бота.
+Проанализируй завершенную работу и реши, стоит ли сохранить что-то в Obsidian для будущих задач.
+
+Сохраняй только долговечные и полезные факты:
+- информация о маркетологе, его предпочтениях, стиле работы и постоянных правилах;
+- данные о брендах, аудиториях, офферах и позиционировании;
+- важные выводы из выполненных работ;
+- повторяющиеся требования пользователя;
+- недостающие данные, которые нужно спросить позже.
+
+Не сохраняй:
+- временные рассуждения;
+- одноразовые детали без будущей пользы;
+- API-ключи, пароли, токены, секреты;
+- чувствительные персональные данные, если пользователь явно не попросил хранить их.
+
+Задача пользователя:
+{task_text}
+
+Готовый план:
+Проект: {plan.project}
+Цель: {plan.goal}
+Период: {plan.period_days}
+Резюме: {plan.executive_summary}
+Позиционирование: {plan.strategy.positioning}
+Аудитория: {plan.strategy.audience}
+Тон: {plan.strategy.tone}
+Рубрики: {", ".join(plan.strategy.content_pillars)}
+Офферы: {", ".join(plan.strategy.key_offers)}
+
+Использованные источники:
+{source_block}
+
+Верни только валидный JSON без Markdown:
+{{
+  "should_write": true,
+  "importance": 3,
+  "summary": "что именно стоит запомнить и зачем",
+  "facts": [
+    {{"category": "marketer|brand|audience|offer|style|workflow|result|missing_data", "text": "короткий факт", "confidence": "low|medium|high"}}
+  ],
+  "followups": ["что уточнить в будущем"],
+  "tags": ["ai-memory", "marketing"]
+}}
+
+Если сохранять нечего, верни:
+{{"should_write": false, "importance": 1, "summary": "", "facts": [], "followups": [], "tags": []}}
+""".strip()
+
+
 class GeminiProvider(AIProvider):
     name = "gemini"
 
-    async def generate_plan(self, task_text: str, snippets: list[KnowledgeSnippet], config: RuntimeConfig) -> ContentPlan:
+    async def _generate_json(self, prompt: str, config: RuntimeConfig) -> str:
         if not config.gemini_api_key:
             raise AIProviderError("Gemini API key is not configured")
-        prompt = build_prompt(task_text, snippets, config)
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{config.gemini_model}:generateContent"
         payload: dict[str, Any] = {
             "contents": [{"role": "user", "parts": [{"text": prompt}]}],
             "generationConfig": {
-                "temperature": 0.65,
+                "temperature": 0.45,
                 "responseMimeType": "application/json",
             },
         }
@@ -122,10 +190,28 @@ class GeminiProvider(AIProvider):
             raise AIProviderError(f"Gemini failed: {response.status_code} {response.text[:300]}")
         data = response.json()
         try:
-            text = data["candidates"][0]["content"]["parts"][0]["text"]
-            return parse_plan(text)
-        except (KeyError, IndexError, ValidationError, json.JSONDecodeError) as exc:
+            return data["candidates"][0]["content"]["parts"][0]["text"]
+        except (KeyError, IndexError) as exc:
+            raise AIProviderError(f"Gemini returned invalid response: {exc}") from exc
+
+    async def generate_plan(self, task_text: str, snippets: list[KnowledgeSnippet], config: RuntimeConfig) -> ContentPlan:
+        prompt = build_prompt(task_text, snippets, config)
+        try:
+            return parse_plan(await self._generate_json(prompt, config))
+        except (ValidationError, json.JSONDecodeError) as exc:
             raise AIProviderError(f"Gemini returned invalid plan: {exc}") from exc
+
+    async def extract_memory_update(
+        self,
+        task_text: str,
+        plan: ContentPlan,
+        snippets: list[KnowledgeSnippet],
+        config: RuntimeConfig,
+    ) -> MemoryUpdate:
+        try:
+            return parse_memory_update(await self._generate_json(build_memory_prompt(task_text, plan, snippets, config), config))
+        except (ValidationError, json.JSONDecodeError) as exc:
+            raise AIProviderError(f"Gemini returned invalid memory update: {exc}") from exc
 
 
 class OpenAICompatibleProvider(AIProvider):
@@ -139,12 +225,11 @@ class OpenAICompatibleProvider(AIProvider):
         self.api_key_attr = api_key_attr
         self.model_attr = model_attr
 
-    async def generate_plan(self, task_text: str, snippets: list[KnowledgeSnippet], config: RuntimeConfig) -> ContentPlan:
+    async def _generate_json(self, prompt: str, config: RuntimeConfig) -> str:
         api_key = getattr(config, self.api_key_attr)
         model = getattr(config, self.model_attr)
         if not api_key:
             raise AIProviderError(f"{self.name} API key is not configured")
-        prompt = build_prompt(task_text, snippets, config)
         headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
         if self.name == "openrouter":
             headers["HTTP-Referer"] = "http://localhost"
@@ -155,7 +240,7 @@ class OpenAICompatibleProvider(AIProvider):
                 {"role": "system", "content": "Return only valid JSON. No Markdown."},
                 {"role": "user", "content": prompt},
             ],
-            "temperature": 0.65,
+            "temperature": 0.55,
             "response_format": {"type": "json_object"},
         }
         async with httpx.AsyncClient(timeout=90) as client:
@@ -164,10 +249,28 @@ class OpenAICompatibleProvider(AIProvider):
             raise AIProviderError(f"{self.name} failed: {response.status_code} {response.text[:300]}")
         data = response.json()
         try:
-            text = data["choices"][0]["message"]["content"]
-            return parse_plan(text)
-        except (KeyError, IndexError, ValidationError, json.JSONDecodeError) as exc:
+            return data["choices"][0]["message"]["content"]
+        except (KeyError, IndexError) as exc:
+            raise AIProviderError(f"{self.name} returned invalid response: {exc}") from exc
+
+    async def generate_plan(self, task_text: str, snippets: list[KnowledgeSnippet], config: RuntimeConfig) -> ContentPlan:
+        prompt = build_prompt(task_text, snippets, config)
+        try:
+            return parse_plan(await self._generate_json(prompt, config))
+        except (ValidationError, json.JSONDecodeError) as exc:
             raise AIProviderError(f"{self.name} returned invalid plan: {exc}") from exc
+
+    async def extract_memory_update(
+        self,
+        task_text: str,
+        plan: ContentPlan,
+        snippets: list[KnowledgeSnippet],
+        config: RuntimeConfig,
+    ) -> MemoryUpdate:
+        try:
+            return parse_memory_update(await self._generate_json(build_memory_prompt(task_text, plan, snippets, config), config))
+        except (ValidationError, json.JSONDecodeError) as exc:
+            raise AIProviderError(f"{self.name} returned invalid memory update: {exc}") from exc
 
 
 class LocalFallbackProvider(AIProvider):
@@ -224,6 +327,30 @@ class LocalFallbackProvider(AIProvider):
             sources=sources,
         )
 
+    async def extract_memory_update(
+        self,
+        task_text: str,
+        plan: ContentPlan,
+        snippets: list[KnowledgeSnippet],
+        config: RuntimeConfig,
+    ) -> MemoryUpdate:
+        facts = [
+            MemoryFact(category="result", text=f"Создан контент-план для проекта '{plan.project}' на {plan.period_days} дней.", confidence="high"),
+            MemoryFact(category="workflow", text=f"Пользователь поставил задачу: {task_text[:300]}", confidence="medium"),
+        ]
+        if plan.strategy.tone:
+            facts.append(MemoryFact(category="style", text=f"Для проекта '{plan.project}' использован тон: {plan.strategy.tone}", confidence="medium"))
+        if plan.strategy.audience:
+            facts.append(MemoryFact(category="audience", text=f"Аудитория проекта '{plan.project}': {plan.strategy.audience}", confidence="medium"))
+        return MemoryUpdate(
+            should_write=True,
+            importance=3,
+            summary=f"Сохранен рабочий след по задаче '{plan.project}', чтобы будущие планы учитывали предыдущий опыт.",
+            facts=facts,
+            followups=plan.recommendations[:3],
+            tags=["ai-memory", "content-plan", "local-fallback"],
+        )
+
 
 class AIProviderRouter:
     def __init__(self) -> None:
@@ -261,3 +388,25 @@ class AIProviderRouter:
         errors.append("All configured providers failed; local fallback was used.")
         return plan, provider.name, errors
 
+    async def extract_memory_update(
+        self,
+        task_text: str,
+        plan: ContentPlan,
+        snippets: list[KnowledgeSnippet],
+        config: RuntimeConfig,
+    ) -> tuple[MemoryUpdate, str, list[str]]:
+        errors: list[str] = []
+        for provider_name in config.ai_provider_order:
+            provider = self.providers.get(provider_name)
+            if provider is None:
+                errors.append(f"Unknown provider: {provider_name}")
+                continue
+            try:
+                return await provider.extract_memory_update(task_text, plan, snippets, config), provider.name, errors
+            except Exception as exc:  # noqa: BLE001 - memory extraction must fallback
+                errors.append(f"{provider.name}: {exc}")
+                continue
+        provider = self.providers["local"]
+        update = await provider.extract_memory_update(task_text, plan, snippets, config)
+        errors.append("All configured memory providers failed; local fallback was used.")
+        return update, provider.name, errors

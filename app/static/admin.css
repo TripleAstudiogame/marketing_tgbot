@@ -106,6 +106,8 @@ input {
 .result small { display: block; color: var(--muted); margin: 4px 0; }
 .empty { color: var(--muted); text-align: center; padding: 20px; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; color: var(--text); }
+.memory-grid { display: grid; grid-template-columns: minmax(320px, 44%) 1fr; gap: 16px; align-items: start; }
+.memory-preview { max-height: 70vh; overflow: auto; background: #f8faf9; border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
 
 @media (max-width: 900px) {
   .sidebar { position: static; width: auto; }
@@ -113,5 +115,5 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; color: var(--te
   .stats { grid-template-columns: repeat(2, 1fr); }
   .field { grid-template-columns: 1fr; }
   .page-header { display: block; }
+  .memory-grid { grid-template-columns: 1fr; }
 }
-

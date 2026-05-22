@@ -19,6 +19,10 @@ async def test_local_fallback_generates_plan() -> None:
         openrouter_api_key="",
         openrouter_model="",
         max_knowledge_snippets=5,
+        ai_memory_enabled=True,
+        ai_memory_dir="06_AI_Memory",
+        ai_memory_min_importance=2,
+        ai_memory_auto_reindex=True,
         pollinations_enabled=False,
         brand_name="Test Brand",
         brand_primary_color="#0f766e",
@@ -28,4 +32,3 @@ async def test_local_fallback_generates_plan() -> None:
     assert plan.project == "Test Brand"
     assert len(plan.calendar) == 14
     assert plan.calendar[0].hook
-

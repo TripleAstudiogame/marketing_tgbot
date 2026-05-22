@@ -21,6 +21,7 @@
   <dl class="kv">
     <dt>Brand</dt><dd>{{ runtime.brand_name }}</dd>
     <dt>Obsidian vault</dt><dd>{{ runtime.obsidian_vault_path }}</dd>
+    <dt>AI memory</dt><dd>{{ runtime.ai_memory_enabled }} · {{ runtime.ai_memory_dir }}</dd>
     <dt>AI order</dt><dd>{{ runtime.ai_provider_order|join(", ") }}</dd>
     <dt>Webhook mode</dt><dd>{{ settings.telegram_use_webhook }}</dd>
   </dl>
@@ -49,4 +50,3 @@
   </table>
 </section>
 {% endblock %}
-

@@ -1,0 +1,53 @@
+{% extends "admin_base.html" %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <h1>AI Memory</h1>
+    <p>Durable notes written into Obsidian so the bot remembers prior work and preferences.</p>
+  </div>
+  <form action="/admin/memory/initialize" method="post">
+    <button class="button" type="submit">Initialize memory</button>
+  </form>
+</header>
+
+{% if request.query_params.get("initialized") %}
+<div class="notice">Memory folder initialized.</div>
+{% endif %}
+
+<section class="panel">
+  <dl class="kv">
+    <dt>Enabled</dt><dd>{{ runtime.ai_memory_enabled }}</dd>
+    <dt>Folder</dt><dd>{{ memory_path }}</dd>
+    <dt>Min importance</dt><dd>{{ runtime.ai_memory_min_importance }}</dd>
+    <dt>Auto reindex</dt><dd>{{ runtime.ai_memory_auto_reindex }}</dd>
+  </dl>
+</section>
+
+<section class="memory-grid">
+  <div class="panel">
+    <h2>Files</h2>
+    <table>
+      <thead><tr><th>Path</th><th>Size</th></tr></thead>
+      <tbody>
+        {% for item in files %}
+        <tr>
+          <td><a href="/admin/memory?file={{ item.path }}">{{ item.path }}</a></td>
+          <td>{{ item.size }} bytes</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="2" class="empty">No memory files yet. Click Initialize memory or complete a bot task.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h2>{{ selected_file or "Preview" }}</h2>
+    {% if selected_content %}
+    <pre class="memory-preview">{{ selected_content }}</pre>
+    {% else %}
+    <p class="empty">Select a file to preview it.</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

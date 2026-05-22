@@ -3,7 +3,7 @@ from __future__ import annotations
 import secrets
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
@@ -16,6 +16,7 @@ from app.models import Job, JobStatus, KnowledgeDocument
 from app.runtime import get_runtime_config, get_settings_for_admin, update_runtime_settings
 from app.services.jobs import cancel_job, jobs_query, retry_job
 from app.services.knowledge import KnowledgeBase
+from app.services.memory import MemoryService
 
 
 admin_router = APIRouter(prefix="/admin", tags=["admin"])
@@ -75,39 +76,13 @@ async def settings_page(
 
 @admin_router.post("/settings")
 async def save_settings(
+    request: Request,
     _: str = Depends(require_admin),
     session: AsyncSession = Depends(get_session),
-    OBSIDIAN_VAULT_PATH: str = Form(""),
-    TELEGRAM_ALLOWED_USER_IDS: str = Form(""),
-    AI_PROVIDER_ORDER: str = Form(""),
-    GEMINI_API_KEY: str = Form(""),
-    GEMINI_MODEL: str = Form(""),
-    GROQ_API_KEY: str = Form(""),
-    GROQ_MODEL: str = Form(""),
-    OPENROUTER_API_KEY: str = Form(""),
-    OPENROUTER_MODEL: str = Form(""),
-    MAX_KNOWLEDGE_SNIPPETS: str = Form(""),
-    POLLINATIONS_ENABLED: str = Form("false"),
-    BRAND_NAME: str = Form(""),
-    BRAND_PRIMARY_COLOR: str = Form(""),
-    BRAND_ACCENT_COLOR: str = Form(""),
 ) -> RedirectResponse:
-    values = {
-        "OBSIDIAN_VAULT_PATH": OBSIDIAN_VAULT_PATH,
-        "TELEGRAM_ALLOWED_USER_IDS": TELEGRAM_ALLOWED_USER_IDS,
-        "AI_PROVIDER_ORDER": AI_PROVIDER_ORDER,
-        "GEMINI_API_KEY": GEMINI_API_KEY,
-        "GEMINI_MODEL": GEMINI_MODEL,
-        "GROQ_API_KEY": GROQ_API_KEY,
-        "GROQ_MODEL": GROQ_MODEL,
-        "OPENROUTER_API_KEY": OPENROUTER_API_KEY,
-        "OPENROUTER_MODEL": OPENROUTER_MODEL,
-        "MAX_KNOWLEDGE_SNIPPETS": MAX_KNOWLEDGE_SNIPPETS,
-        "POLLINATIONS_ENABLED": POLLINATIONS_ENABLED,
-        "BRAND_NAME": BRAND_NAME,
-        "BRAND_PRIMARY_COLOR": BRAND_PRIMARY_COLOR,
-        "BRAND_ACCENT_COLOR": BRAND_ACCENT_COLOR,
-    }
+    form = await request.form()
+    items = await get_settings_for_admin(session)
+    values = {str(item["key"]): str(form.get(str(item["key"]), "")) for item in items}
     await update_runtime_settings(session, values)
     return RedirectResponse("/admin/settings?saved=1", status_code=303)
 
@@ -145,6 +120,61 @@ async def reindex_knowledge(
     knowledge = KnowledgeBase(runtime.obsidian_vault_path, get_settings().knowledge_index_file)
     await knowledge.rebuild_index(session)
     return RedirectResponse("/admin/knowledge?reindexed=1", status_code=303)
+
+
+@admin_router.get("/memory", response_class=HTMLResponse)
+async def memory_page(
+    request: Request,
+    file: str = "",
+    _: str = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> HTMLResponse:
+    runtime = await get_runtime_config(session)
+    memory = MemoryService(runtime.obsidian_vault_path, runtime.ai_memory_dir)
+    files: list[dict[str, str | int]] = []
+    selected_content = ""
+    selected_file = ""
+
+    if memory.memory_path.exists():
+        for path in sorted(memory.memory_path.rglob("*.md")):
+            relative = str(path.relative_to(memory.memory_path)).replace("\\", "/")
+            files.append(
+                {
+                    "path": relative,
+                    "size": path.stat().st_size,
+                    "updated": path.stat().st_mtime_ns,
+                }
+            )
+        if file:
+            candidate = (memory.memory_path / file).resolve()
+            root = memory.memory_path.resolve()
+            if root in candidate.parents or candidate == root:
+                if candidate.exists() and candidate.suffix.lower() == ".md":
+                    selected_file = str(candidate.relative_to(memory.memory_path)).replace("\\", "/")
+                    selected_content = candidate.read_text(encoding="utf-8", errors="replace")[:50000]
+
+    return templates.TemplateResponse(
+        "admin_memory.html",
+        {
+            "request": request,
+            "runtime": runtime,
+            "memory_path": memory.memory_path,
+            "files": files,
+            "selected_file": selected_file,
+            "selected_content": selected_content,
+        },
+    )
+
+
+@admin_router.post("/memory/initialize")
+async def initialize_memory(
+    _: str = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> RedirectResponse:
+    runtime = await get_runtime_config(session)
+    memory = MemoryService(runtime.obsidian_vault_path, runtime.ai_memory_dir)
+    memory.initialize()
+    return RedirectResponse("/admin/memory?initialized=1", status_code=303)
 
 
 @admin_router.get("/jobs", response_class=HTMLResponse)
@@ -194,4 +224,3 @@ async def cancel_job_action(
         raise HTTPException(status_code=404, detail="Job not found")
     await cancel_job(session, job)
     return RedirectResponse(f"/admin/jobs/{job_id}", status_code=303)
-
