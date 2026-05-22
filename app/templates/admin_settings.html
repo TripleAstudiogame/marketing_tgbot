@@ -1,0 +1,34 @@
+{% extends "admin_base.html" %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <h1>Settings</h1>
+    <p>Runtime settings override values from .env. Empty secret fields keep existing values.</p>
+  </div>
+</header>
+
+{% if request.query_params.get("saved") %}
+<div class="notice">Settings saved.</div>
+{% endif %}
+
+<form class="panel form" action="/admin/settings" method="post">
+  {% for item in items %}
+  <label class="field">
+    <span>
+      <strong>{{ item.label }}</strong>
+      <small>{{ item.description }}</small>
+      <small>Key: {{ item.key }}</small>
+    </span>
+    {% if item.is_secret %}
+      <input name="{{ item.key }}" type="password" placeholder="{% if item.value %}Configured. Leave empty to keep.{% else %}Not configured{% endif %}">
+    {% else %}
+      <input name="{{ item.key }}" value="{{ item.value }}">
+    {% endif %}
+  </label>
+  {% endfor %}
+  <div class="actions">
+    <button class="button" type="submit">Save settings</button>
+  </div>
+</form>
+{% endblock %}
+

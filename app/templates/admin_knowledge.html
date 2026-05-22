@@ -1,0 +1,55 @@
+{% extends "admin_base.html" %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <h1>Knowledge</h1>
+    <p>Obsidian vault: {{ runtime.obsidian_vault_path }}</p>
+  </div>
+  <form action="/admin/knowledge/reindex" method="post">
+    <button class="button" type="submit">Reindex knowledge</button>
+  </form>
+</header>
+
+{% if request.query_params.get("reindexed") %}
+<div class="notice">Knowledge index rebuilt.</div>
+{% endif %}
+
+<section class="panel">
+  <form class="search" method="get" action="/admin/knowledge">
+    <input name="q" value="{{ q }}" placeholder="Search knowledge...">
+    <button class="button secondary" type="submit">Search</button>
+  </form>
+  {% if q %}
+    <h2>Search results</h2>
+    {% for item in results %}
+    <article class="result">
+      <strong>{{ item.title }}</strong>
+      <small>{{ item.source_path }} · score {{ "%.1f"|format(item.score) }}</small>
+      <p>{{ item.text }}</p>
+    </article>
+    {% else %}
+    <p class="empty">No results.</p>
+    {% endfor %}
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>Indexed documents</h2>
+  <table>
+    <thead><tr><th>Path</th><th>Title</th><th>Chunks</th><th>Indexed</th></tr></thead>
+    <tbody>
+      {% for doc in docs %}
+      <tr>
+        <td>{{ doc.path }}</td>
+        <td>{{ doc.title }}</td>
+        <td>{{ doc.chunk_count }}</td>
+        <td>{{ doc.indexed_at.strftime("%Y-%m-%d %H:%M") }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="empty">No indexed documents. Click Reindex knowledge.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}
+

@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <style>
+    @page { size: A4; margin: 12mm 10mm; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      color: #10201d;
+      background: #f7f8f6;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .cover {
+      min-height: 245mm;
+      padding: 22mm 18mm;
+      background: linear-gradient(135deg, {{ config.brand_primary_color }}, #12312d 62%, {{ config.brand_accent_color }});
+      color: white;
+      page-break-after: always;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .cover small { text-transform: uppercase; letter-spacing: .08em; opacity: .82; }
+    .cover h1 { font-size: 42px; line-height: 1.05; margin: 28mm 0 8mm; max-width: 160mm; }
+    .cover p { font-size: 16px; max-width: 155mm; }
+    .meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 16mm; }
+    .meta div { border: 1px solid rgba(255,255,255,.35); border-radius: 8px; padding: 10px; }
+    .page { background: #fff; padding: 10mm; margin-bottom: 8mm; page-break-inside: avoid; }
+    h2 { font-size: 22px; margin: 0 0 8px; color: {{ config.brand_primary_color }}; }
+    h3 { font-size: 15px; margin: 0 0 6px; }
+    .summary { font-size: 14px; }
+    .pillars, .offers, .recommendations { display: flex; flex-wrap: wrap; gap: 6px; padding: 0; list-style: none; }
+    .pillars li, .offers li, .recommendations li {
+      border: 1px solid #d8e4df;
+      border-radius: 999px;
+      padding: 6px 9px;
+      background: #f3faf7;
+    }
+    .day {
+      border: 1px solid #dce4e0;
+      border-radius: 8px;
+      margin: 8px 0;
+      padding: 10px;
+      background: #fff;
+      page-break-inside: avoid;
+    }
+    .day-head { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+    .badge {
+      background: {{ config.brand_accent_color }};
+      color: #17150b;
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .hook { color: {{ config.brand_primary_color }}; font-weight: 700; }
+    .visual { background: #f6f7f5; border-left: 3px solid {{ config.brand_accent_color }}; padding: 8px; margin-top: 8px; }
+    .sources { font-size: 10px; color: #56635e; }
+  </style>
+</head>
+<body>
+  <section class="cover">
+    <div>
+      <small>{{ config.brand_name }}</small>
+      <h1>{{ plan.project }}</h1>
+      <p>{{ plan.executive_summary }}</p>
+      <div class="meta">
+        <div><small>Период</small><br><strong>{{ plan.period_days }} дней</strong></div>
+        <div><small>AI</small><br><strong>{{ provider }}</strong></div>
+        <div><small>Дата</small><br><strong>{{ generated_at }}</strong></div>
+      </div>
+    </div>
+    <div>
+      <small>Контент-план, стратегия, посты, CTA и визуальные промпты</small>
+    </div>
+  </section>
+
+  <section class="page">
+    <h2>Стратегия</h2>
+    <p class="summary"><strong>Цель:</strong> {{ plan.goal }}</p>
+    <p><strong>Позиционирование:</strong> {{ plan.strategy.positioning }}</p>
+    <p><strong>Аудитория:</strong> {{ plan.strategy.audience }}</p>
+    <p><strong>Тон:</strong> {{ plan.strategy.tone }}</p>
+    <h3>Рубрики</h3>
+    <ul class="pillars">{% for item in plan.strategy.content_pillars %}<li>{{ item }}</li>{% endfor %}</ul>
+    <h3>Офферы</h3>
+    <ul class="offers">{% for item in plan.strategy.key_offers %}<li>{{ item }}</li>{% endfor %}</ul>
+  </section>
+
+  <section class="page">
+    <h2>Календарь и готовые публикации</h2>
+    {% for item in plan.calendar %}
+    <article class="day">
+      <div class="day-head">
+        <div>
+          <h3>День {{ item.day }}: {{ item.topic }}</h3>
+          <div>{{ item.platform }} · {{ item.format }}</div>
+        </div>
+        <span class="badge">Day {{ item.day }}</span>
+      </div>
+      <p class="hook">{{ item.hook }}</p>
+      <p>{{ item.post_text }}</p>
+      <p><strong>CTA:</strong> {{ item.cta }}</p>
+      <div class="visual"><strong>Visual prompt:</strong> {{ item.visual_prompt }}</div>
+    </article>
+    {% endfor %}
+  </section>
+
+  <section class="page">
+    <h2>Рекомендации</h2>
+    <ul class="recommendations">{% for item in plan.recommendations %}<li>{{ item }}</li>{% endfor %}</ul>
+    {% if plan.sources %}
+    <h2>Источники из Obsidian</h2>
+    <ul class="sources">{% for source in plan.sources %}<li>{{ source }}</li>{% endfor %}</ul>
+    {% endif %}
+  </section>
+</body>
+</html>
+

@@ -1,0 +1,27 @@
+{% extends "admin_base.html" %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <h1>Job #{{ job.id }}</h1>
+    <p>{{ job.created_at.strftime("%Y-%m-%d %H:%M") }} · {{ job.username or job.user_id }}</p>
+  </div>
+  <div class="actions">
+    <form action="/admin/jobs/{{ job.id }}/retry" method="post"><button class="button secondary" type="submit">Retry</button></form>
+    <form action="/admin/jobs/{{ job.id }}/cancel" method="post"><button class="button danger" type="submit">Cancel</button></form>
+  </div>
+</header>
+
+<section class="panel">
+  <dl class="kv">
+    <dt>Status</dt><dd><span class="badge {{ job.status.value }}">{{ job.status.value }}</span></dd>
+    <dt>Task</dt><dd>{{ job.task_text }}</dd>
+    <dt>Progress</dt><dd><pre>{{ job.progress_text }}</pre></dd>
+    <dt>Summary</dt><dd>{{ job.result_summary }}</dd>
+    <dt>PDF</dt><dd>{{ job.result_pdf_path or "-" }}</dd>
+    <dt>HTML</dt><dd>{{ job.result_html_path or "-" }}</dd>
+    <dt>Markdown</dt><dd>{{ job.result_markdown_path or "-" }}</dd>
+    <dt>Error</dt><dd><pre>{{ job.error or "-" }}</pre></dd>
+  </dl>
+</section>
+{% endblock %}
+

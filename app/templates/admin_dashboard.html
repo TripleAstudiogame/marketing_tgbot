@@ -1,0 +1,52 @@
+{% extends "admin_base.html" %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <h1>Dashboard</h1>
+    <p>Telegram marketing bot status and recent work.</p>
+  </div>
+  <a class="button" href="/admin/settings">Open settings</a>
+</header>
+
+<section class="stats">
+  <div class="stat"><small>Pending</small><strong>{{ totals.pending }}</strong></div>
+  <div class="stat"><small>Running</small><strong>{{ totals.running }}</strong></div>
+  <div class="stat"><small>Completed</small><strong>{{ totals.completed }}</strong></div>
+  <div class="stat"><small>Failed</small><strong>{{ totals.failed }}</strong></div>
+  <div class="stat"><small>Knowledge docs</small><strong>{{ docs_count }}</strong></div>
+</section>
+
+<section class="panel">
+  <h2>Runtime</h2>
+  <dl class="kv">
+    <dt>Brand</dt><dd>{{ runtime.brand_name }}</dd>
+    <dt>Obsidian vault</dt><dd>{{ runtime.obsidian_vault_path }}</dd>
+    <dt>AI order</dt><dd>{{ runtime.ai_provider_order|join(", ") }}</dd>
+    <dt>Webhook mode</dt><dd>{{ settings.telegram_use_webhook }}</dd>
+  </dl>
+</section>
+
+<section class="panel">
+  <div class="panel-head">
+    <h2>Latest jobs</h2>
+    <a href="/admin/jobs">View all</a>
+  </div>
+  <table>
+    <thead><tr><th>ID</th><th>Status</th><th>User</th><th>Task</th><th>Created</th></tr></thead>
+    <tbody>
+      {% for job in jobs %}
+      <tr>
+        <td><a href="/admin/jobs/{{ job.id }}">#{{ job.id }}</a></td>
+        <td><span class="badge {{ job.status.value }}">{{ job.status.value }}</span></td>
+        <td>{{ job.username or job.user_id }}</td>
+        <td>{{ job.task_text[:120] }}</td>
+        <td>{{ job.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="empty">No jobs yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}
+

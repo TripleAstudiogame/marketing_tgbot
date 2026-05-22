@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title or "Marketing Bot Admin" }}</title>
+  <link rel="stylesheet" href="/static/admin.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-mark">M</span>
+      <div>
+        <strong>Marketing Bot</strong>
+        <small>Admin panel</small>
+      </div>
+    </div>
+    <nav>
+      <a href="/admin">Dashboard</a>
+      <a href="/admin/settings">Settings</a>
+      <a href="/admin/knowledge">Knowledge</a>
+      <a href="/admin/jobs">Jobs</a>
+      <a href="/health">Health</a>
+    </nav>
+  </aside>
+  <main class="content">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>
+
