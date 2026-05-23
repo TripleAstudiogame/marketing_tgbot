@@ -34,7 +34,10 @@ if (-not (Test-Path ".env")) {
     throw ".env not found. Run START_LOCAL.bat first and complete /admin/setup."
 }
 if (-not (Test-Path ".venv\Scripts\python.exe")) {
-    PowerShell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\setup_windows.ps1"
+    PowerShell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\bootstrap_windows.ps1"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Bootstrap failed."
+    }
 }
 
 $token = Read-EnvValue -Key "TELEGRAM_BOT_TOKEN"

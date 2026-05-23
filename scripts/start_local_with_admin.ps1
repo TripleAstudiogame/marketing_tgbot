@@ -43,8 +43,11 @@ if (-not (Test-Path ".env")) {
 }
 
 if (-not (Test-Path ".venv\Scripts\python.exe")) {
-    Write-Host "Virtual environment is missing. Running setup..." -ForegroundColor Yellow
-    PowerShell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\setup_windows.ps1"
+    Write-Host "Runtime is missing. Running first-time bootstrap..." -ForegroundColor Yellow
+    PowerShell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\bootstrap_windows.ps1"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Bootstrap failed."
+    }
 }
 
 $port = Read-EnvValue -Key "APP_PORT" -Default "8000"

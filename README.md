@@ -23,9 +23,16 @@ Production-oriented Telegram bot for marketing content plans. It reads an Obsidi
 
 ## Quick Start On Windows Server 2019
 
-1. Install Python 3.11+ and Git.
-2. Copy `.env.example` to `.env`.
-3. Fill at least:
+1. Download the repository as ZIP or clone it with Git.
+2. Double-click:
+
+```text
+START_LOCAL.bat
+```
+
+On first run the launcher creates `.env`, installs Python 3.11 for the current user if Python is missing, creates `.venv`, installs Python packages, downloads Playwright Chromium, initializes SQLite, starts the admin panel, and opens setup in the browser.
+
+3. In the admin setup page fill at least:
 
 ```env
 TELEGRAM_BOT_TOKEN=your_bot_token
@@ -34,13 +41,15 @@ ADMIN_PASSWORD=strong-password
 GEMINI_API_KEY=optional-but-recommended
 ```
 
-4. Run setup:
+Telegram and cloud AI keys are not bundled and cannot be generated automatically. The app can start in setup-only mode without them; Telegram work begins after a BotFather token is saved and the app is restarted.
+
+Manual setup is still available:
 
 ```powershell
 PowerShell -ExecutionPolicy Bypass -File .\scripts\setup_windows.ps1
 ```
 
-5. Start local all-in-one mode by double-clicking:
+Start local all-in-one mode by double-clicking:
 
 ```text
 START_LOCAL.bat
@@ -66,7 +75,7 @@ To stop local processes:
 STOP_LOCAL.bat
 ```
 
-6. Open admin panel:
+Open admin panel:
 
 ```text
 http://127.0.0.1:8000/admin

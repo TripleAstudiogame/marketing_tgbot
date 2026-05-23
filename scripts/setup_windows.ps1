@@ -1,5 +1,6 @@
 param(
-    [string]$PythonCommand = "python"
+    [string]$PythonCommand = "python",
+    [string]$PythonCommandArgs = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -17,13 +18,28 @@ function Invoke-Native {
     }
 }
 
+function Invoke-Python {
+    param(
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$Arguments
+    )
+    $prefixArgs = @()
+    if ($PythonCommandArgs) {
+        $prefixArgs = $PythonCommandArgs.Split(" ", [System.StringSplitOptions]::RemoveEmptyEntries)
+    }
+    & $PythonCommand @prefixArgs @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "Command failed with exit code ${LASTEXITCODE}: $PythonCommand $PythonCommandArgs $Arguments"
+    }
+}
+
 if (-not (Test-Path ".env")) {
     Copy-Item ".env.example" ".env"
     Write-Host "Created .env from .env.example. Edit it before production use." -ForegroundColor Yellow
 }
 
-if (-not (Test-Path ".venv")) {
-    Invoke-Native $PythonCommand -m venv .venv
+$VenvPython = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
+if (-not (Test-Path $VenvPython)) {
+    Invoke-Python -m venv .venv --clear
 }
 
 $Python = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
