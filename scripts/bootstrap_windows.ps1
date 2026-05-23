@@ -123,10 +123,32 @@ function Invoke-PythonSetup {
     }
 }
 
+function Repair-LegacyAdminPassword {
+    $envFile = Join-Path $ProjectRoot ".env"
+    if (-not (Test-Path $envFile)) {
+        return
+    }
+    $content = Get-Content -Path $envFile -Encoding UTF8
+    $changed = $false
+    $content = $content | ForEach-Object {
+        if ($_ -match "^\s*ADMIN_PASSWORD\s*=\s*change-me-now\s*$") {
+            $changed = $true
+            "ADMIN_PASSWORD=admin"
+        } else {
+            $_
+        }
+    }
+    if ($changed) {
+        $content | Set-Content -Path $envFile -Encoding UTF8
+        Write-Host "Updated default admin password in .env to admin." -ForegroundColor Yellow
+    }
+}
+
 if (-not (Test-Path ".env")) {
     Copy-Item ".env.example" ".env"
     Write-Host "Created .env from .env.example" -ForegroundColor Yellow
 }
+Repair-LegacyAdminPassword
 
 $venvPython = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
 if (Test-Path $venvPython) {

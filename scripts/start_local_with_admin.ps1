@@ -18,6 +18,27 @@ function Read-EnvValue {
     return ($line -split "=", 2)[1].Trim()
 }
 
+function Repair-LegacyAdminPassword {
+    $envFile = Join-Path $ProjectRoot ".env"
+    if (-not (Test-Path $envFile)) {
+        return
+    }
+    $content = Get-Content -Path $envFile -Encoding UTF8
+    $changed = $false
+    $content = $content | ForEach-Object {
+        if ($_ -match "^\s*ADMIN_PASSWORD\s*=\s*change-me-now\s*$") {
+            $changed = $true
+            "ADMIN_PASSWORD=admin"
+        } else {
+            $_
+        }
+    }
+    if ($changed) {
+        $content | Set-Content -Path $envFile -Encoding UTF8
+        Write-Host "Updated default admin password in .env to admin." -ForegroundColor Yellow
+    }
+}
+
 function Wait-ForHealth {
     param(
         [Parameter(Mandatory=$true)][string]$Url,
@@ -41,6 +62,7 @@ if (-not (Test-Path ".env")) {
     Copy-Item ".env.example" ".env"
     Write-Host "Created .env from .env.example" -ForegroundColor Yellow
 }
+Repair-LegacyAdminPassword
 
 if (-not (Test-Path ".venv\Scripts\python.exe")) {
     Write-Host "Runtime is missing. Running first-time bootstrap..." -ForegroundColor Yellow

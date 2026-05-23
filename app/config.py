@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     public_base_url: str = ""
     secret_key: str = "change-this-long-random-secret"
     admin_username: str = "admin"
-    admin_password: str = "change-me-now"
+    admin_password: str = "admin"
     run_worker_in_web: bool = True
 
     database_url: str = "sqlite+aiosqlite:///./data/app.db"
