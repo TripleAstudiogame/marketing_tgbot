@@ -1,9 +1,13 @@
 from __future__ import annotations
 
-from sqlalchemy import Select, select
+from datetime import timedelta
+
+from sqlalchemy import Select, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Job, JobStatus, utc_now
+
+STALE_JOB_MINUTES = 30
 
 
 async def create_job(
@@ -29,19 +33,42 @@ async def create_job(
     return job
 
 
-async def get_next_pending_job(session: AsyncSession) -> Job | None:
+async def recover_stale_jobs(session: AsyncSession, older_than_minutes: int = STALE_JOB_MINUTES) -> int:
+    cutoff = utc_now() - timedelta(minutes=older_than_minutes)
     result = await session.execute(
-        select(Job)
+        update(Job)
+        .where(Job.status == JobStatus.running, Job.updated_at < cutoff)
+        .values(status=JobStatus.pending, updated_at=utc_now())
+    )
+    await session.commit()
+    return result.rowcount or 0
+
+
+async def get_next_pending_job(session: AsyncSession) -> Job | None:
+    id_result = await session.execute(
+        select(Job.id)
         .where(Job.status == JobStatus.pending)
         .order_by(Job.created_at.asc())
         .limit(1)
     )
-    job = result.scalar_one_or_none()
-    if not job:
+    job_id = id_result.scalar_one_or_none()
+    if job_id is None:
         return None
-    job.status = JobStatus.running
-    job.attempts += 1
-    job.updated_at = utc_now()
+
+    result = await session.execute(
+        update(Job)
+        .where(Job.id == job_id, Job.status == JobStatus.pending)
+        .values(
+            status=JobStatus.running,
+            attempts=Job.attempts + 1,
+            updated_at=utc_now(),
+        )
+        .returning(Job)
+    )
+    job = result.scalar_one_or_none()
+    if job is None:
+        await session.rollback()
+        return None
     await session.commit()
     await session.refresh(job)
     return job
@@ -94,4 +121,3 @@ async def cancel_job(session: AsyncSession, job: Job) -> None:
 
 def jobs_query() -> Select[tuple[Job]]:
     return select(Job).order_by(Job.created_at.desc())
-

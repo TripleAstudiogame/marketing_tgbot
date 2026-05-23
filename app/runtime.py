@@ -32,7 +32,7 @@ SETTING_DEFINITIONS: list[SettingDefinition] = [
     SettingDefinition("TELEGRAM_USE_WEBHOOK", "Telegram webhook mode", "true/false. Local mode should normally be false.", "telegram_use_webhook"),
     SettingDefinition("PUBLIC_BASE_URL", "Public base URL", "HTTPS domain for webhook mode.", "public_base_url"),
     SettingDefinition("OBSIDIAN_VAULT_PATH", "Obsidian vault path", "Folder with Markdown notes.", "obsidian_vault_path"),
-    SettingDefinition("TELEGRAM_ALLOWED_USER_IDS", "Allowed Telegram user IDs", "Comma-separated list. Empty means everyone can use the bot.", "telegram_allowed_user_ids"),
+    SettingDefinition("TELEGRAM_ALLOWED_USER_IDS", "Legacy allowed user IDs", "Optional comma-separated bootstrap IDs. Normal access is managed in Admin → Bot.", "telegram_allowed_user_ids"),
     SettingDefinition("AI_PROVIDER_ORDER", "AI provider order", "Comma-separated list: gemini, groq, openrouter, local.", "ai_provider_order"),
     SettingDefinition("GEMINI_API_KEY", "Gemini API key", "Recommended free-first LLM provider.", "gemini_api_key", True),
     SettingDefinition("GEMINI_MODEL", "Gemini model", "Example: gemini-2.5-flash.", "gemini_model"),

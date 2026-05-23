@@ -131,6 +131,17 @@
     const data = await fetchJson("/admin/api/vaults/discover");
     renderCandidates(data.candidates || []);
   });
+
+  async function loadVaultCandidates() {
+    if (!candidates || candidates.dataset.loaded === "true") return;
+    candidates.dataset.loaded = "true";
+    try {
+      const data = await fetchJson("/admin/api/vaults/discover");
+      renderCandidates(data.candidates || []);
+    } catch (error) {
+      candidates.innerHTML = '<div class="empty-state"><strong>Автопоиск не ответил</strong><span>Открой проводник и выбери папку вручную.</span></div>';
+    }
+  }
   modal?.addEventListener("click", (event) => {
     if (event.target === modal) closeModal();
   });
@@ -138,5 +149,22 @@
     if (event.key === "Escape" && modal && !modal.hidden) closeModal();
   });
 
+  document.querySelectorAll("form").forEach((form) => {
+    form.addEventListener("submit", () => {
+      const active = document.activeElement;
+      const submitter = active instanceof HTMLButtonElement && active.type === "submit"
+        ? active
+        : form.querySelector('button[type="submit"]');
+      if (!submitter) return;
+      submitter.classList.add("is-loading");
+      submitter.textContent = submitter.dataset.busyText || "Сохраняю...";
+      form.setAttribute("aria-busy", "true");
+      setTimeout(() => {
+        submitter.disabled = true;
+      }, 0);
+    });
+  });
+
   if (vaultInput) setVaultPath(vaultInput.value);
+  loadVaultCandidates();
 })();

@@ -3,27 +3,30 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{ title or "Marketing Bot Admin" }}</title>
+  <title>{{ title or "Marketing Bot" }}</title>
   <link rel="stylesheet" href="/static/admin.css">
 </head>
 <body>
   <aside class="sidebar">
-    <div class="brand">
+    <a class="brand" href="/admin" aria-label="Главная">
       <span class="brand-mark">M</span>
       <div>
         <strong>Marketing Bot</strong>
-        <small>Admin panel</small>
+        <small>Панель управления</small>
       </div>
-    </div>
+    </a>
     <nav>
-      <a href="/admin">Dashboard</a>
-      <a href="/admin/setup">Подключение</a>
-      <a href="/admin/settings">Настройки</a>
-      <a href="/admin/knowledge">База знаний</a>
-      <a href="/admin/memory">Память ИИ</a>
-      <a href="/admin/jobs">Задачи</a>
-      <a href="/admin/system">Система</a>
-      <a href="/health">Health</a>
+      <span class="nav-label">Основное</span>
+      <a href="/admin" class="{% if request.url.path == '/admin' or request.url.path == '/admin/' %}active{% endif %}">Главная</a>
+      <a href="/admin/bot" class="{% if request.url.path.startswith('/admin/bot') %}active{% endif %}">Доступ к боту</a>
+      <a href="/admin/jobs" class="{% if request.url.path.startswith('/admin/jobs') %}active{% endif %}">Задачи</a>
+      <span class="nav-label">Настройка</span>
+      <a href="/admin/setup" class="{% if request.url.path.startswith('/admin/setup') %}active{% endif %}">Подключение</a>
+      <a href="/admin/knowledge" class="{% if request.url.path.startswith('/admin/knowledge') %}active{% endif %}">База знаний</a>
+      <a href="/admin/memory" class="{% if request.url.path.startswith('/admin/memory') %}active{% endif %}">Память ИИ</a>
+      <span class="nav-label">Сервис</span>
+      <a href="/admin/settings" class="{% if request.url.path.startswith('/admin/settings') %}active{% endif %}">Расширенные</a>
+      <a href="/admin/system" class="{% if request.url.path.startswith('/admin/system') %}active{% endif %}">Диагностика</a>
     </nav>
   </aside>
   <main class="content">

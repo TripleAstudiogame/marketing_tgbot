@@ -14,7 +14,8 @@
 </header>
 
 {% if request.query_params.get("message") %}
-<div class="notice {% if request.query_params.get('telegram') == 'error' or request.query_params.get('obsidian') == 'error' or request.query_params.get('ai') == 'error' %}error{% endif %}">
+{% set notice_state = request.query_params.get('telegram') or request.query_params.get('obsidian') or request.query_params.get('ai') %}
+<div class="notice {% if notice_state == 'error' %}error{% elif notice_state == 'warning' %}warning{% endif %}">
   {{ request.query_params.get("message") }}
 </div>
 {% endif %}
@@ -78,8 +79,8 @@
         </button>
         {% else %}
         <div class="empty-state">
-          <strong>Vault пока не найден автоматически</strong>
-          <span>Нажми “Выбрать папку” или оставь создание стартового vault включенным.</span>
+          <strong>Ищу vault в фоне...</strong>
+          <span>Страница уже готова. Можно сразу нажать “Выбрать папку” или дождаться найденных вариантов.</span>
         </div>
         {% endfor %}
       </div>
@@ -177,10 +178,7 @@
         <span>BotFather token</span>
         <input name="TELEGRAM_BOT_TOKEN" type="password" placeholder="{% if telegram_configured %}Оставь пустым, чтобы не менять{% else %}123456:ABC...{% endif %}">
       </label>
-      <label>
-        <span>Доступ по Telegram ID</span>
-        <input name="TELEGRAM_ALLOWED_USER_IDS" value="{{ runtime.telegram_allowed_user_ids|join(',') }}" placeholder="123456789">
-      </label>
+      <div class="hint">Доступ пользователей подтверждается во вкладке «Доступ к боту» в админке.</div>
       <label class="toggle-line">
         <input name="TELEGRAM_USE_WEBHOOK" type="checkbox" {% if telegram_use_webhook %}checked{% endif %}>
         <span>Webhook для публичного сервера</span>
@@ -190,6 +188,17 @@
         <input name="PUBLIC_BASE_URL" value="{{ public_base_url }}" placeholder="https://your-domain.com">
       </label>
       <div class="hint">После смены токена перезапусти программу, чтобы Telegram polling стартовал с новым токеном.</div>
+      {% if request.query_params.get("telegram") %}
+      <div class="save-result {{ request.query_params.get('telegram') }}">
+        {% if request.query_params.get("telegram") == "ok" %}
+        Сохранено и проверено
+        {% elif request.query_params.get("telegram") == "warning" %}
+        Сохранено, но нужна проверка токена
+        {% else %}
+        Проверь данные и попробуй снова
+        {% endif %}
+      </div>
+      {% endif %}
       <button class="button wide-button" type="submit">Сохранить Telegram</button>
     </form>
 

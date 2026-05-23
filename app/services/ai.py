@@ -8,12 +8,17 @@ from typing import Any
 import httpx
 from pydantic import ValidationError
 
+from app.config import get_settings
 from app.runtime import RuntimeConfig
 from app.schemas import CalendarItem, ContentPlan, ContentStrategy, KnowledgeSnippet, MemoryFact, MemoryUpdate
 
 
 class AIProviderError(RuntimeError):
     pass
+
+
+def _ai_timeout() -> float:
+    return float(get_settings().ai_request_timeout_seconds)
 
 
 class AIProvider(ABC):
@@ -184,7 +189,7 @@ class GeminiProvider(AIProvider):
                 "responseMimeType": "application/json",
             },
         }
-        async with httpx.AsyncClient(timeout=90) as client:
+        async with httpx.AsyncClient(timeout=_ai_timeout()) as client:
             response = await client.post(url, params={"key": config.gemini_api_key}, json=payload)
         if response.status_code >= 400:
             raise AIProviderError(f"Gemini failed: {response.status_code} {response.text[:300]}")
@@ -243,7 +248,7 @@ class OpenAICompatibleProvider(AIProvider):
             "temperature": 0.55,
             "response_format": {"type": "json_object"},
         }
-        async with httpx.AsyncClient(timeout=90) as client:
+        async with httpx.AsyncClient(timeout=_ai_timeout()) as client:
             response = await client.post(f"{self.base_url}/chat/completions", headers=headers, json=payload)
         if response.status_code >= 400:
             raise AIProviderError(f"{self.name} failed: {response.status_code} {response.text[:300]}")

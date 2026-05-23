@@ -23,6 +23,12 @@ class JobStatus(StrEnum):
     canceled = "canceled"
 
 
+class BotAccessStatus(StrEnum):
+    pending = "pending"
+    approved = "approved"
+    rejected = "rejected"
+
+
 class RuntimeSetting(Base):
     __tablename__ = "runtime_settings"
 
@@ -50,6 +56,24 @@ class Job(Base):
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+
+class BotAccessRequest(Base):
+    __tablename__ = "bot_access_requests"
+
+    telegram_user_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    chat_id: Mapped[int] = mapped_column(Integer, index=True)
+    username: Mapped[str] = mapped_column(String(255), default="")
+    first_name: Mapped[str] = mapped_column(String(255), default="")
+    last_name: Mapped[str] = mapped_column(String(255), default="")
+    status: Mapped[BotAccessStatus] = mapped_column(
+        Enum(BotAccessStatus),
+        default=BotAccessStatus.pending,
+        index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class KnowledgeDocument(Base):

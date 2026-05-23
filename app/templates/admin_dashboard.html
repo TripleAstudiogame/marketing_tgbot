@@ -2,63 +2,65 @@
 {% block content %}
 <header class="page-header">
   <div>
-    <h1>Dashboard</h1>
-    <p>Telegram marketing bot status and recent work.</p>
+    <h1>Главная</h1>
+    <p>Краткий статус бота и последние задачи.</p>
   </div>
   <div class="actions">
-    <a class="button" href="/admin/setup">Открыть подключение</a>
-    <a class="button secondary" href="/admin/system">Диагностика</a>
-    <a class="button secondary" href="/admin/settings">Расширенные настройки</a>
+    <a class="button" href="/admin/setup">Подключить сервисы</a>
+    {% if pending_access %}
+    <a class="button accent" href="/admin/bot">Заявки ({{ pending_access }})</a>
+    {% endif %}
   </div>
 </header>
 
 <section class="system-banner {{ diagnostics.status }}">
   <div>
     <strong>
-      {% if diagnostics.status == "ok" %}Система готова{% elif diagnostics.status == "warning" %}Система требует настройки{% else %}Есть критичные ошибки{% endif %}
+      {% if diagnostics.status == "ok" %}Всё работает{% elif diagnostics.status == "warning" %}Нужна настройка{% else %}Есть ошибки{% endif %}
     </strong>
-    <span>{{ diagnostics.checks|length }} проверок · Worker: {% if worker_state.running %}работает{% else %}не активен{% endif %}</span>
+    <span>
+      Worker: {% if worker_state.running %}активен{% else %}не запущен{% endif %}
+      · Vault: {{ runtime.obsidian_vault_path }}
+    </span>
   </div>
-  <a href="/admin/system">Открыть подробности</a>
+  <a href="/admin/system">Подробнее</a>
 </section>
 
-<section class="stats">
-  <div class="stat"><small>Pending</small><strong>{{ totals.pending }}</strong></div>
-  <div class="stat"><small>Running</small><strong>{{ totals.running }}</strong></div>
-  <div class="stat"><small>Completed</small><strong>{{ totals.completed }}</strong></div>
-  <div class="stat"><small>Failed</small><strong>{{ totals.failed }}</strong></div>
-  <div class="stat"><small>Knowledge docs</small><strong>{{ docs_count }}</strong></div>
+{% if pending_access %}
+<section class="panel highlight-panel">
+  <div class="panel-head">
+    <h2>Заявки на доступ</h2>
+    <a class="button" href="/admin/bot">Открыть ({{ pending_access }})</a>
+  </div>
+  <p class="panel-note">Пользователи ждут подтверждения, прежде чем смогут отправлять задачи боту.</p>
 </section>
+{% endif %}
 
-<section class="panel">
-  <h2>Runtime</h2>
-  <dl class="kv">
-    <dt>Brand</dt><dd>{{ runtime.brand_name }}</dd>
-    <dt>Obsidian vault</dt><dd>{{ runtime.obsidian_vault_path }}</dd>
-    <dt>AI memory</dt><dd>{{ runtime.ai_memory_enabled }} · {{ runtime.ai_memory_dir }}</dd>
-    <dt>AI order</dt><dd>{{ runtime.ai_provider_order|join(", ") }}</dd>
-    <dt>Webhook mode</dt><dd>{{ settings.telegram_use_webhook }}</dd>
-  </dl>
+<section class="stats stats-compact">
+  <div class="stat"><small>В очереди</small><strong>{{ totals.pending }}</strong></div>
+  <div class="stat"><small>В работе</small><strong>{{ totals.running }}</strong></div>
+  <div class="stat"><small>Готово</small><strong>{{ totals.completed }}</strong></div>
+  <div class="stat"><small>Ошибки</small><strong>{{ totals.failed }}</strong></div>
 </section>
 
 <section class="panel">
   <div class="panel-head">
-    <h2>Latest jobs</h2>
-    <a href="/admin/jobs">View all</a>
+    <h2>Последние задачи</h2>
+    <a href="/admin/jobs">Все задачи</a>
   </div>
   <table>
-    <thead><tr><th>ID</th><th>Status</th><th>User</th><th>Task</th><th>Created</th></tr></thead>
+    <thead><tr><th>#</th><th>Статус</th><th>Пользователь</th><th>Задача</th><th>Дата</th></tr></thead>
     <tbody>
       {% for job in jobs %}
       <tr>
         <td><a href="/admin/jobs/{{ job.id }}">#{{ job.id }}</a></td>
         <td><span class="badge {{ job.status.value }}">{{ job.status.value }}</span></td>
         <td>{{ job.username or job.user_id }}</td>
-        <td>{{ job.task_text[:120] }}</td>
-        <td>{{ job.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+        <td>{{ job.task_text[:100] }}{% if job.task_text|length > 100 %}…{% endif %}</td>
+        <td>{{ job.created_at.strftime("%d.%m.%Y %H:%M") }}</td>
       </tr>
       {% else %}
-      <tr><td colspan="5" class="empty">No jobs yet.</td></tr>
+      <tr><td colspan="5" class="empty">Задач пока нет.</td></tr>
       {% endfor %}
     </tbody>
   </table>

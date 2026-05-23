@@ -9,8 +9,7 @@ from datetime import datetime, timezone
 from aiogram import Bot
 
 from app.db import async_session_factory
-from app.models import JobStatus
-from app.services.jobs import get_next_pending_job
+from app.services.jobs import get_next_pending_job, recover_stale_jobs
 from app.services.report_pipeline import ReportPipeline
 
 logger = logging.getLogger(__name__)
@@ -35,8 +34,6 @@ async def process_one_job(bot: Bot) -> bool:
         job = await get_next_pending_job(session)
         if not job:
             return False
-        if job.status == JobStatus.canceled:
-            return True
         worker_state.last_job_id = job.id
         logger.info("Processing job %s", job.id)
         pipeline = ReportPipeline(bot)
@@ -54,6 +51,10 @@ async def worker_loop(
     worker_state.started_at = datetime.now(timezone.utc)
     worker_state.running = True
     logger.info("Worker loop started")
+    async with async_session_factory() as session:
+        recovered = await recover_stale_jobs(session)
+        if recovered:
+            logger.warning("Recovered %s stale running job(s)", recovered)
     while True:
         if stop_condition and stop_condition():
             worker_state.running = False

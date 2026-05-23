@@ -11,11 +11,19 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.concurrency import run_in_threadpool
 
 from app.config import get_settings
 from app.db import get_session
-from app.models import Job, JobStatus, KnowledgeDocument
+from app.models import BotAccessStatus, Job, JobStatus, KnowledgeDocument
 from app.runtime import get_runtime_config, get_runtime_settings, get_settings_for_admin, parse_bool, update_runtime_settings
+from app.services.access import (
+    approve_access_request,
+    count_pending_requests,
+    list_access_requests,
+    reject_access_request,
+    revoke_access,
+)
 from app.services.env_file import update_env_file
 from app.services.diagnostics import collect_diagnostics
 from app.services.jobs import cancel_job, jobs_query, retry_job
@@ -57,25 +65,25 @@ def setup_redirect(**params: str) -> RedirectResponse:
 
 async def check_telegram_token(token: str) -> tuple[bool, str]:
     if not token:
-        return False, "Token is empty."
+        return False, "токен пустой"
     try:
         async with httpx.AsyncClient(timeout=12) as client:
             response = await client.get(f"https://api.telegram.org/bot{token}/getMe")
         if response.status_code >= 400:
-            return False, f"Telegram returned HTTP {response.status_code}."
+            return False, f"Telegram вернул HTTP {response.status_code}"
         data = response.json()
         if not data.get("ok"):
-            return False, data.get("description", "Telegram token check failed.")
+            return False, data.get("description", "проверка Telegram-токена не прошла")
         user = data.get("result", {})
         username = user.get("username") or user.get("first_name") or "bot"
-        return True, f"Connected as @{username}."
+        return True, f"подключено как @{username}"
     except Exception as exc:  # noqa: BLE001 - admin check must not crash setup
-        return False, f"Telegram check failed: {exc}"
+        return False, f"проверка Telegram не прошла: {exc}"
 
 
 async def check_ai_provider(provider: str, key: str, model: str) -> tuple[bool, str]:
     if provider != "local" and not key:
-        return False, f"{provider} API key is empty."
+        return False, f"API-ключ {provider} пустой"
     try:
         async with httpx.AsyncClient(timeout=18) as client:
             if provider == "gemini":
@@ -85,13 +93,13 @@ async def check_ai_provider(provider: str, key: str, model: str) -> tuple[bool, 
             elif provider == "openrouter":
                 response = await client.get("https://openrouter.ai/api/v1/key", headers={"Authorization": f"Bearer {key}"})
             else:
-                return True, "Local fallback is always available. It is useful for tests, but cloud AI gives better content."
+                return True, "локальный fallback доступен; для лучшего контента подключи облачный ИИ"
         if response.status_code >= 400:
-            return False, f"{provider} returned HTTP {response.status_code}: {response.text[:160]}"
+            return False, f"{provider} вернул HTTP {response.status_code}: {response.text[:160]}"
         suffix = f" Model: {model}." if model else ""
-        return True, f"{provider} API key looks valid.{suffix}"
+        return True, f"API-ключ {provider} выглядит рабочим.{suffix}"
     except Exception as exc:  # noqa: BLE001 - admin check must not crash setup
-        return False, f"{provider} check failed: {exc}"
+        return False, f"проверка {provider} не прошла: {exc}"
 
 
 def ensure_starter_vault(path: Path) -> None:
@@ -132,6 +140,7 @@ async def dashboard(
         result = await session.execute(select(func.count()).select_from(Job).where(Job.status == status_item))
         totals[status_item.value] = result.scalar_one()
     docs_count = (await session.execute(select(func.count()).select_from(KnowledgeDocument))).scalar_one()
+    pending_access = await count_pending_requests(session)
     latest_jobs = (await session.execute(jobs_query().limit(8))).scalars().all()
     runtime = await get_runtime_config(session)
     diagnostics = await collect_diagnostics(session, get_settings(), runtime)
@@ -142,6 +151,7 @@ async def dashboard(
             "request": request,
             "totals": totals,
             "docs_count": docs_count,
+            "pending_access": pending_access,
             "jobs": latest_jobs,
             "runtime": runtime,
             "settings": get_settings(),
@@ -149,6 +159,88 @@ async def dashboard(
             "worker_state": worker_state,
         },
     )
+
+
+@admin_router.get("/bot", response_class=HTMLResponse)
+async def bot_access_page(
+    request: Request,
+    _: str = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> HTMLResponse:
+    pending = await list_access_requests(session, BotAccessStatus.pending)
+    approved = await list_access_requests(session, BotAccessStatus.approved)
+    rejected = await list_access_requests(session, BotAccessStatus.rejected, limit=20)
+    return templates.TemplateResponse(
+        request,
+        "admin_bot.html",
+        {
+            "request": request,
+            "pending": pending,
+            "approved": approved,
+            "rejected": rejected,
+            "pending_count": len(pending),
+        },
+    )
+
+
+async def _notify_access_decision(chat_id: int, approved: bool) -> None:
+    settings = get_settings()
+    if not settings.telegram_bot_token or not chat_id:
+        return
+    try:
+        from app.bot import create_bot
+
+        bot = create_bot()
+        if approved:
+            text = (
+                "Доступ одобрен!\n\n"
+                "Теперь можно писать задачу одним сообщением — я соберу контент-план и отправлю PDF."
+            )
+        else:
+            text = "Заявка на доступ отклонена. Если это ошибка — свяжитесь с администратором."
+        await bot.send_message(chat_id, text)
+        await bot.session.close()
+    except Exception:  # noqa: BLE001 - notification must not break admin action
+        return
+
+
+@admin_router.post("/bot/{user_id}/approve")
+async def approve_bot_access(
+    user_id: int,
+    _: str = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> RedirectResponse:
+    record = await approve_access_request(session, user_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Access request not found")
+    await _notify_access_decision(record.chat_id, approved=True)
+    return RedirectResponse("/admin/bot?approved=1", status_code=303)
+
+
+@admin_router.post("/bot/{user_id}/reject")
+async def reject_bot_access(
+    user_id: int,
+    _: str = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> RedirectResponse:
+    record = await reject_access_request(session, user_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Access request not found")
+    await _notify_access_decision(record.chat_id, approved=False)
+    return RedirectResponse("/admin/bot?rejected=1", status_code=303)
+
+
+@admin_router.post("/bot/{user_id}/revoke")
+async def revoke_bot_access(
+    user_id: int,
+    _: str = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> RedirectResponse:
+    record = await revoke_access(session, user_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Access request not found")
+    await _notify_access_decision(record.chat_id, approved=False)
+    return RedirectResponse("/admin/bot?revoked=1", status_code=303)
 
 
 @admin_router.get("/system", response_class=HTMLResponse)
@@ -206,7 +298,6 @@ async def setup_page(
         "openrouter": configured_secret(stored.get("OPENROUTER_API_KEY", settings.openrouter_api_key)),
         "local": True,
     }
-    vault_candidates = discover_vaults(max_depth=2, max_results=8)
     return templates.TemplateResponse(
         request,
         "admin_setup.html",
@@ -225,7 +316,7 @@ async def setup_page(
             "memory_path": memory.memory_path,
             "memory_exists": memory.memory_path.exists(),
             "provider_status": provider_status,
-            "vault_candidates": vault_candidates,
+            "vault_candidates": [],
         },
     )
 
@@ -235,14 +326,16 @@ async def api_filesystem(
     path: str = "",
     _: str = Depends(require_admin),
 ) -> JSONResponse:
-    return JSONResponse(list_directories(path or None))
+    data = await run_in_threadpool(list_directories, path or None)
+    return JSONResponse(data)
 
 
 @admin_router.get("/api/vaults/discover")
 async def api_discover_vaults(
     _: str = Depends(require_admin),
 ) -> JSONResponse:
-    return JSONResponse({"candidates": discover_vaults(max_depth=3, max_results=20)})
+    candidates = await run_in_threadpool(discover_vaults, 3, 20)
+    return JSONResponse({"candidates": candidates})
 
 
 @admin_router.post("/setup/telegram")
@@ -256,7 +349,6 @@ async def setup_telegram(
     stored = await get_runtime_settings(session)
     token_input = str(form.get("TELEGRAM_BOT_TOKEN", "")).strip()
     values = {
-        "TELEGRAM_ALLOWED_USER_IDS": str(form.get("TELEGRAM_ALLOWED_USER_IDS", "")).strip(),
         "TELEGRAM_USE_WEBHOOK": form_bool(form.get("TELEGRAM_USE_WEBHOOK")),
         "PUBLIC_BASE_URL": str(form.get("PUBLIC_BASE_URL", "")).strip(),
     }
@@ -270,7 +362,17 @@ async def setup_telegram(
 
     token = token_input or stored.get("TELEGRAM_BOT_TOKEN", "") or settings.telegram_bot_token
     ok, message = await check_telegram_token(token)
-    return setup_redirect(telegram="ok" if ok else "error", message=message)
+    if ok:
+        return setup_redirect(telegram="ok", message=f"Настройки Telegram сохранены и проверены: {message}.")
+    if token:
+        return setup_redirect(
+            telegram="warning",
+            message=f"Настройки Telegram сохранены, но проверка токена не прошла: {message}.",
+        )
+    return setup_redirect(
+        telegram="warning",
+        message="Настройки Telegram сохранены. Добавь BotFather token, чтобы бот мог принимать задачи.",
+    )
 
 
 @admin_router.post("/setup/obsidian")
@@ -343,8 +445,10 @@ async def setup_ai(
             "local": "local",
         }
         ok, message = await check_ai_provider(provider, key_map[provider], model_map[provider])
-        return setup_redirect(ai="ok" if ok else "error", message=message)
-    return setup_redirect(ai="ok", message="AI settings saved.")
+        if ok:
+            return setup_redirect(ai="ok", message=f"Настройки ИИ сохранены и проверены: {message}.")
+        return setup_redirect(ai="warning", message=f"Настройки ИИ сохранены, но проверка не прошла: {message}.")
+    return setup_redirect(ai="ok", message="Настройки ИИ сохранены.")
 
 
 @admin_router.get("/settings", response_class=HTMLResponse)
@@ -367,6 +471,7 @@ async def save_settings(
     items = await get_settings_for_admin(session)
     values = {str(item["key"]): str(form.get(str(item["key"]), "")) for item in items}
     await update_runtime_settings(session, values)
+    update_env_file(values)
     return RedirectResponse("/admin/settings?saved=1", status_code=303)
 
 

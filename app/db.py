@@ -27,8 +27,3 @@ async def init_db() -> None:
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
     async with async_session_factory() as session:
         yield session
-
-
-async def new_session() -> AsyncSession:
-    return async_session_factory()
-

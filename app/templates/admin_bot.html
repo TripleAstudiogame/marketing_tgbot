@@ -1,0 +1,128 @@
+{% extends "admin_base.html" %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <h1>Доступ к боту</h1>
+    <p>Подтверждайте заявки пользователей Telegram, прежде чем они смогут отправлять задачи.</p>
+  </div>
+  {% if pending_count %}
+  <div class="actions">
+    <span class="pill-alert">{{ pending_count }} новых заявок</span>
+  </div>
+  {% endif %}
+</header>
+
+{% if request.query_params.get("approved") %}
+<div class="notice">Доступ одобрен. Пользователь получил уведомление в Telegram.</div>
+{% elif request.query_params.get("rejected") %}
+<div class="notice">Заявка отклонена.</div>
+{% elif request.query_params.get("revoked") %}
+<div class="notice">Доступ отозван.</div>
+{% endif %}
+
+<section class="panel">
+  <div class="panel-head">
+    <h2>Новые заявки</h2>
+    <span class="muted-text">{{ pending|length }} шт.</span>
+  </div>
+  {% if pending %}
+  <table>
+    <thead>
+      <tr>
+        <th>Пользователь</th>
+        <th>Telegram ID</th>
+        <th>Дата</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in pending %}
+      <tr>
+        <td>
+          <strong>{{ item.first_name }} {{ item.last_name }}</strong>
+          {% if item.username %}<br><span class="muted-text">@{{ item.username }}</span>{% endif %}
+        </td>
+        <td><code>{{ item.telegram_user_id }}</code></td>
+        <td>{{ item.created_at.strftime("%d.%m.%Y %H:%M") }}</td>
+        <td class="row-actions">
+          <form action="/admin/bot/{{ item.telegram_user_id }}/approve" method="post">
+            <button class="button" type="submit">Одобрить</button>
+          </form>
+          <form action="/admin/bot/{{ item.telegram_user_id }}/reject" method="post">
+            <button class="button secondary" type="submit">Отклонить</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">Новых заявок нет. Когда пользователь нажмёт «Да, оставить заявку» в боте — он появится здесь.</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <div class="panel-head">
+    <h2>Доступ открыт</h2>
+    <span class="muted-text">{{ approved|length }} шт.</span>
+  </div>
+  {% if approved %}
+  <table>
+    <thead>
+      <tr>
+        <th>Пользователь</th>
+        <th>Telegram ID</th>
+        <th>Одобрен</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in approved %}
+      <tr>
+        <td>
+          <strong>{{ item.first_name }} {{ item.last_name }}</strong>
+          {% if item.username %}<br><span class="muted-text">@{{ item.username }}</span>{% endif %}
+        </td>
+        <td><code>{{ item.telegram_user_id }}</code></td>
+        <td>{{ (item.reviewed_at or item.updated_at).strftime("%d.%m.%Y %H:%M") }}</td>
+        <td>
+          <form action="/admin/bot/{{ item.telegram_user_id }}/revoke" method="post">
+            <button class="button danger" type="submit">Закрыть доступ</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">Пока никому не одобрен доступ.</p>
+  {% endif %}
+</section>
+
+{% if rejected %}
+<section class="panel muted-panel">
+  <div class="panel-head">
+    <h2>Отклонённые</h2>
+    <span class="muted-text">последние {{ rejected|length }}</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Пользователь</th>
+        <th>Telegram ID</th>
+        <th>Дата</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in rejected %}
+      <tr>
+        <td>{{ item.first_name }} {{ item.last_name }}{% if item.username %} (@{{ item.username }}){% endif %}</td>
+        <td><code>{{ item.telegram_user_id }}</code></td>
+        <td>{{ (item.reviewed_at or item.updated_at).strftime("%d.%m.%Y %H:%M") }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+{% endblock %}
