@@ -75,7 +75,7 @@ class ReportPipeline:
                 progress_text("Изучаю задачу и готовлю поисковые запросы.", 10),
             )
 
-            if not settings.knowledge_index_file.exists():
+            if knowledge.needs_rebuild():
                 await self._set_progress(
                     session,
                     messenger,

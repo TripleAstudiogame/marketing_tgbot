@@ -8,6 +8,11 @@ class KnowledgeSnippet(BaseModel):
     title: str
     text: str
     score: float = 0.0
+    chunk_id: str = ""
+    heading: str = ""
+    tags: list[str] = Field(default_factory=list)
+    links: list[str] = Field(default_factory=list)
+    metadata: dict[str, str] = Field(default_factory=dict)
 
 
 class ContentStrategy(BaseModel):

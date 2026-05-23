@@ -158,6 +158,20 @@ MarketingVault/
 
 The bot reads Markdown directly. You can edit notes in Obsidian, then click **Reindex Knowledge** in the admin panel.
 
+## RAG Over Obsidian
+
+The bot uses an Obsidian-first hybrid RAG index:
+
+- reads Markdown files directly from the vault;
+- parses frontmatter, headings, hashtags, and `[[wikilinks]]`;
+- splits notes into overlapping chunks;
+- stores source path, heading, tags, links, metadata, lexical tokens, and local hashed vectors;
+- retrieves context with a hybrid score: BM25-style keyword relevance, local vector cosine similarity, phrase/title/tag boosts, and core marketing document boosts;
+- injects only the best snippets into the AI prompt with source metadata and chunk IDs;
+- automatically rebuilds old indexes when the RAG index version changes.
+
+This is fully local and free. Cloud LLM APIs are used for generation, but the Obsidian retrieval layer does not require a paid embedding service.
+
 ## Admin Panel
 
 Routes:

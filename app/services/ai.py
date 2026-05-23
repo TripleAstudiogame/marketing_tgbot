@@ -65,6 +65,19 @@ def build_prompt(task_text: str, snippets: list[KnowledgeSnippet], config: Runti
     if not knowledge_block:
         knowledge_block = "База знаний пока пустая или не проиндексирована. Используй здравую маркетинговую структуру и явно отметь, что данных мало."
 
+    if snippets:
+        metadata_block = "\n".join(
+            (
+                f"[S{index}] source={snippet.source_path}; "
+                f"chunk={snippet.chunk_id or '-'}; "
+                f"heading={snippet.heading or snippet.title}; "
+                f"tags={', '.join(snippet.tags) if snippet.tags else '-'}; "
+                f"rag_score={snippet.score:.2f}"
+            )
+            for index, snippet in enumerate(snippets, start=1)
+        )
+        knowledge_block = f"{knowledge_block}\n\nRAG metadata and citations:\n{metadata_block}"
+
     return f"""
 Ты senior marketing strategist, content lead и editorial planner.
 Твоя задача: создать практичный, живой и готовый к публикации контент-план для бизнеса.
